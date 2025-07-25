@@ -1,5 +1,5 @@
 general:
-  data_path: ../data/
+  data_path: ../../input/data/
   model_name: digit82/kobart-summarization
   output_dir: ./
 inference:
