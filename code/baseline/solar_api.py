@@ -17,7 +17,7 @@ Original file is located at
 - 필요한 라이브러리를 설치한 후 불러옵니다.
 """
 
-!pip install openai
+# !pip install openai
 
 import pandas as pd
 import os
@@ -175,7 +175,7 @@ if __name__ == "__main__":
 - Solar Chat API을 이용하여 test dataset에 포함된 dialogue를 요약하고 제출용 파일을 생성합니다.
 """
 
-def inference():
+def inference(output_filename="output_solar.csv"):
     test_df = pd.read_csv(os.path.join(DATA_PATH, 'test.csv'))
 
     summary = []
@@ -206,14 +206,14 @@ def inference():
 
     if not os.path.exists(RESULT_PATH):
         os.makedirs(RESULT_PATH)
-    output.to_csv(os.path.join(RESULT_PATH, "output_solar.csv"), index=False)
+    output.to_csv(os.path.join(RESULT_PATH, output_filename), index=False)
 
     return output
 
 if __name__ == "__main__":
-    output = inference()
+    output = inference("output_solar.csv")
 
-output  # 각 대화문에 대한 요약문이 출력됨을 확인할 수 있습니다.
+print(output)  # 각 대화문에 대한 요약문이 출력됨을 확인할 수 있습니다.
 
 """## 3. Prompt Engineering
 - Prompt engineering을 통해 요약 성능 향상을 시도합니다.
@@ -311,6 +311,6 @@ if __name__ == "__main__":
 
 # 변경된 prompt를 사용하여, test data의 대화를 요약하고, 결과를 확인합니다.
 if __name__ == "__main__":
-    output = inference()
+    output = inference("output_solar_fewshot.csv")
 
-output
+print(output)
