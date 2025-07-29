@@ -14,10 +14,6 @@
 - uv 패키지 매니저
 
 ### Requirements
-```bash
-# uv를 사용한 설치
-uv pip install -r pyproject.toml
-```
 
 주요 라이브러리:
 - `torch>=2.7.1` - 딥러닝 프레임워크
@@ -59,6 +55,7 @@ uv pip install -r pyproject.toml
 │       ├── check_gpu.py         # GPU 확인 유틸리티
 │       └── log_util.py          # 로깅 유틸리티
 ├── input
+│   ├── get_data.sh              # 데이터 다운로드 스크립트
 │   └── data
 │       ├── train.csv            # 학습 데이터
 │       ├── dev.csv              # 검증 데이터
@@ -68,6 +65,13 @@ uv pip install -r pyproject.toml
 ├── .python-version              # 프로젝트에서 사용할 Python 버전 지정 (UV)
 ├── uv.lock                      # 의존성 버전 잠금 파일 (UV)
 └── README.md                    # 프로젝트 문서
+```
+
+### 참고 사항
+- cd input && ./get_data.sh 를 실행하면 데이터를 다운로드 하여 data폴더가 생기게 됩니다.
+- UV로 실행할 경우 다음 명령어로 실행할 수 있습니다:
+```bash
+uv run code/baseline/baseline.py
 ```
 
 ## 3. Data descrption
