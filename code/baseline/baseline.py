@@ -26,6 +26,7 @@ import yaml
 from glob import glob
 from tqdm import tqdm
 from pprint import pprint
+
 import torch
 import pytorch_lightning as pl
 from rouge import Rouge # 모델의 성능을 평가하기 위한 라이브러리입니다.
@@ -37,6 +38,17 @@ from transformers import Trainer, TrainingArguments
 from transformers import EarlyStoppingCallback
 
 import wandb # 모델 학습 과정을 손쉽게 Tracking하고, 시각화할 수 있는 라이브러리입니다.
+
+from dotenv import load_dotenv
+
+# .env 파일 로드
+load_dotenv()
+
+# wandb 사용 여부 확인하고 비활성화
+use_wandb = os.getenv('USE_WANDB', '').lower() == 'true'
+if not use_wandb:
+    # wandb를 완전히 비활성화
+    os.environ['WANDB_DISABLED'] = 'true'
 
 print("""### 2) Config file 만들기 (선택)
 - 모델 생성에 필요한 다양한 매개변수 정보를 저장할 수 있습니다.  
@@ -92,9 +104,9 @@ config_data = {
     },
     # (선택) wandb 홈페이지에 가입하여 얻은 정보를 기반으로 작성합니다.
     "wandb": {
-        "entity": "wandb_repo",
-        "project": "project_name",
-        "name": "run_name"
+        "entity": os.getenv("WANDB_ENTITY", "wandb_repo"),
+        "project": os.getenv("WANDB_PROJECT", "project_name"),
+        "name": os.getenv("WANDB_RUN_NAME", "run_name")
     },
     "inference": {
         "ckt_path": "model ckt path", # 사전 학습이 진행된 모델의 checkpoint를 저장할 경로를 설정합니다.
@@ -113,10 +125,14 @@ print("""- 참고✅
 : wandb 라이브러리를 사용하기 위해선 entity, project, name를 지정해주어야 합니다. wandb 홈페이지에 가입한 후 얻은 정보를 입력하여 작동할 수 있습니다.
 """)
 
-# 모델의 구성 정보를 YAML 파일로 저장합니다.
+# 모델의 구성 정보를 YAML 파일로 저장합니다. (파일이 없을 때만)
 config_path = "./config.yaml"
-with open(config_path, "w") as file:
-    yaml.dump(config_data, file, allow_unicode=True)
+if not os.path.exists(config_path):
+    with open(config_path, "w") as file:
+        yaml.dump(config_data, file, allow_unicode=True)
+    print(f"새로운 config.yaml 파일을 생성했습니다: {config_path}")
+else:
+    print(f"기존 config.yaml 파일을 사용합니다: {config_path}")
 
 print("""### 3) Configuration 불러오기""")
 
@@ -144,10 +160,14 @@ loaded_config['training']
 # 모델 학습 과정에 대한 정보를 제공해주는 wandb 설정 내용을 확인합니다.
 loaded_config['wandb']
 
-# (선택) 이곳에 사용자가 사용할 wandb config 설정
-loaded_config['wandb']['entity'] = "사용할 wandb repo name"
-loaded_config['wandb']['name'] = "사용할 wandb run의 name"
-loaded_config['wandb']['project'] = "사용할 wandb project name"
+# (선택) 환경변수에서 wandb config 설정 업데이트
+if loaded_config['training']['report_to'] == 'wandb' and use_wandb:
+    loaded_config['wandb']['entity'] = os.getenv('WANDB_ENTITY', loaded_config['wandb']['entity'])
+    loaded_config['wandb']['name'] = os.getenv('WANDB_RUN_NAME', loaded_config['wandb']['name'])
+    loaded_config['wandb']['project'] = os.getenv('WANDB_PROJECT', loaded_config['wandb']['project'])
+else:
+    # wandb를 사용하지 않으므로 report_to를 None으로 변경
+    loaded_config['training']['report_to'] = None
 
 # 모델이 최종 결과를 출력하기 위한 매개변수 정보를 확인합니다.
 loaded_config['inference']
@@ -352,6 +372,7 @@ def compute_metrics(config,tokenizer,pred):
 # 학습을 위한 trainer 클래스와 매개변수를 정의합니다.
 def load_trainer_for_train(config,generate_model,tokenizer,train_inputs_dataset,val_inputs_dataset):
     print('-'*10, 'Make training arguments', '-'*10,)
+    
     # set training args
     training_args = Seq2SeqTrainingArguments(
                 output_dir=config['general']['output_dir'], # model output directory
@@ -365,7 +386,7 @@ def load_trainer_for_train(config,generate_model,tokenizer,train_inputs_dataset,
                 lr_scheduler_type=config['training']['lr_scheduler_type'],
                 optim =config['training']['optim'],
                 gradient_accumulation_steps=config['training']['gradient_accumulation_steps'],
-                evaluation_strategy=config['training']['evaluation_strategy'], # evaluation strategy to adopt during training
+                eval_strategy=config['training']['evaluation_strategy'], # evaluation strategy to adopt during training
                 save_strategy =config['training']['save_strategy'],
                 save_total_limit=config['training']['save_total_limit'], # number of total save model.
                 fp16=config['training']['fp16'],
@@ -381,15 +402,17 @@ def load_trainer_for_train(config,generate_model,tokenizer,train_inputs_dataset,
             )
 
     # (선택) 모델의 학습 과정을 추적하는 wandb를 사용하기 위해 초기화 해줍니다.
-    wandb.init(
-        entity=config['wandb']['entity'],
-        project=config['wandb']['project'],
-        name=config['wandb']['name'],
-    )
+    use_wandb = os.getenv('USE_WANDB', '').lower() == 'true'
+    if config['training']['report_to'] == 'wandb' and use_wandb:
+        wandb.init(
+            entity=config['wandb']['entity'],
+            project=config['wandb']['project'],
+            name=config['wandb']['name'],
+        )
 
-    # (선택) 모델 checkpoint를 wandb에 저장하도록 환경 변수를 설정합니다.
-    os.environ["WANDB_LOG_MODEL"]="true"
-    os.environ["WANDB_WATCH"]="false"
+        # (선택) 모델 checkpoint를 wandb에 저장하도록 환경 변수를 설정합니다.
+        os.environ["WANDB_LOG_MODEL"]="true"
+        os.environ["WANDB_WATCH"]="false"
 
     # Validation loss가 더 이상 개선되지 않을 때 학습을 중단시키는 EarlyStopping 기능을 사용합니다.
     MyCallback = EarlyStoppingCallback(
@@ -456,7 +479,9 @@ def main(config):
     trainer.train()   # 모델 학습을 시작합니다.
 
     # (선택) 모델 학습이 완료된 후 wandb를 종료합니다.
-    wandb.finish()
+    use_wandb = os.getenv('USE_WANDB', '').lower() == 'true'
+    if config['training']['report_to'] == 'wandb' and use_wandb:
+        wandb.finish()
 
 if __name__ == "__main__":
     main(loaded_config)
