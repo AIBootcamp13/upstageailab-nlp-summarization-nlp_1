@@ -39,8 +39,13 @@ from torch.utils.data import Dataset , DataLoader
 from transformers import AutoTokenizer, BartForConditionalGeneration, BartConfig
 from transformers import Seq2SeqTrainingArguments, Seq2SeqTrainer
 from transformers import Trainer, TrainingArguments
-from transformers import EarlyStoppingCallback
+from transformers import EarlyStoppingCallback, TrainerCallback
 import wandb # 모델 학습 과정을 손쉽게 Tracking하고, 시각화할 수 있는 라이브러리입니다.
+
+class LoggingCallback(TrainerCallback):
+    def on_log(self, args, state, control, logs=None, **kwargs):
+        if logs and 'eval_loss' in logs:
+            log.info(f"Evaluation metrics: {logs}")
 
 from dotenv import load_dotenv
 load_dotenv() # .env 파일 로드
@@ -364,6 +369,14 @@ def compute_metrics(config,tokenizer,pred):
 
     # 최종적인 ROUGE 점수를 계산합니다.
     results = rouge.get_scores(replaced_predictions, replaced_labels,avg=True)
+    
+    # ROUGE 점수 결과를 로그에 출력
+    log.info('-'*150)
+    log.info("ROUGE Evaluation Results:")
+    for metric_name, metric_values in results.items():
+        log.info(f"{metric_name.upper()}: Precision={metric_values['p']:.4f}, Recall={metric_values['r']:.4f}, F1={metric_values['f']:.4f}")
+    
+    log.info('-'*150)
 
     # ROUGE 점수 중 F-1 score를 통해 평가합니다.
     result = {key: value["f"] for key, value in results.items()}
@@ -429,7 +442,7 @@ def load_trainer_for_train(config,generate_model,tokenizer,train_inputs_dataset,
         train_dataset=train_inputs_dataset,
         eval_dataset=val_inputs_dataset,
         compute_metrics = lambda pred: compute_metrics(config,tokenizer, pred),
-        callbacks = [MyCallback]
+        callbacks = [MyCallback, LoggingCallback()]
     )
     log.info('-'*10, 'Make trainer complete', '-'*10,)
 
