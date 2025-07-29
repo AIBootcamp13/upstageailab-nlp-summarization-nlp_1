@@ -1,0 +1,11 @@
+# 환경 변수 템플릿 파일
+# 이 파일을 .env로 복사하고 실제 값으로 변경하세요.
+
+# Upstage AI API 키
+# https://console.upstage.ai/ 에서 발급받으세요.
+UPSTAGE_API_KEY=up_your_actual_api_key_here
+
+# 사용법:
+# 1. 이 파일을 .env로 복사: cp env_template.txt .env
+# 2. .env 파일에서 your_actual_api_key_here를 실제 API 키로 변경
+# 3. .env 파일은 git에 커밋하지 마세요 (.gitignore에 추가됨)
