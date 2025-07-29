@@ -488,8 +488,20 @@ if __name__ == "__main__":
 
 log.info("""## 4. 모델 추론하기""")
 
-# 이곳에 내가 사용할 wandb config 설정
-loaded_config['inference']['ckt_path'] = "추론에 사용할 ckt 경로 설정"
+# 학습 후 생성된 checkpoint에서 best model 찾기
+import json
+checkpoints = glob('./checkpoint-*')
+if checkpoints:
+    # 가장 최근 checkpoint의 trainer_state.json에서 best model 정보 읽기
+    latest_checkpoint = max(checkpoints, key=lambda x: int(x.split('-')[-1]))
+    with open(os.path.join(latest_checkpoint, 'trainer_state.json'), 'r') as f:
+        state = json.load(f)
+        loaded_config['inference']['ckt_path'] = state['best_model_checkpoint']
+        log.info(f"Best checkpoint 사용: {state['best_model_checkpoint']} (loss: {state['best_metric']:.4f})")
+else:
+    # checkpoint가 없으면 기본 모델 사용
+    loaded_config['inference']['ckt_path'] = loaded_config['general']['model_name']
+    log.info("checkpoint가 없어 기본 모델을 사용합니다.")
 
 log.info("""- test data를 사용하여 모델의 성능을 확인합니다.""")
 
