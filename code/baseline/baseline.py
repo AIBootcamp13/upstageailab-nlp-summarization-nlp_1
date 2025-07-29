@@ -43,12 +43,15 @@ import wandb # 모델 학습 과정을 손쉽게 Tracking하고, 시각화할 �
   따라서, 코드 상에서 모델의 매개변수를 설정할 수도 있지만 독립적인 매개변수 정보 파일을 생성하여 관리할 수 있습니다.
 """
 
+# 스크립트 파일이 있는 디렉토리를 현재 작업 디렉토리로 설정
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
 # config 설정에 tokenizer 모듈이 사용되므로 미리 tokenizer를 정의해줍니다.
 tokenizer = AutoTokenizer.from_pretrained("digit82/kobart-summarization")
 
 config_data = {
     "general": {
-        "data_path": "../data/", # 모델 생성에 필요한 데이터 경로를 사용자 환경에 맞게 지정합니다.
+        "data_path": "../input/data/", # 모델 생성에 필요한 데이터 경로를 사용자 환경에 맞게 지정합니다.
         "model_name": "digit82/kobart-summarization", # 불러올 모델의 이름을 사용자 환경에 맞게 지정할 수 있습니다.
         "output_dir": "./" # 모델의 최종 출력 값을 저장할 경로를 설정합니다.
     },
@@ -560,5 +563,5 @@ def inference(config):
 if __name__ == "__main__":
     output = inference(loaded_config)
 
-output  # 각 대화문에 대한 요약문이 출력됨을 확인할 수 있습니다.
+print(output)  # 각 대화문에 대한 요약문이 출력됨을 확인할 수 있습니다.
 
