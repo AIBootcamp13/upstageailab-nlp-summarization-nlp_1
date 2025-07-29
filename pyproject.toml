@@ -1,0 +1,13 @@
+[project]
+name = "upstageailab-nlp-summarization-nlp-1"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10.13"
+dependencies = [
+    "dotenv>=0.9.9",
+    "openai>=1.97.1",
+    "pandas>=2.3.1",
+    "rouge>=1.0.1",
+    "tqdm>=4.67.1",
+]
