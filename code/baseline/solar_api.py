@@ -25,12 +25,16 @@ import time
 from tqdm import tqdm
 from rouge import Rouge # 모델의 성능을 평가하기 위한 라이브러리입니다.
 from openai import OpenAI # openai==1.2.0
+from dotenv import load_dotenv
+
+# .env 파일에서 환경 변수 로드
+load_dotenv()
 
 """### 2) Solar Chat API Client 생성하기
 - 앞으로 Solar Chat API를 사용하기 위해 Client를 생성합니다.
 """
 
-UPSTAGE_API_KEY = "up_*****************************" # upstage.ai에서 발급받은 API KEY를 입력해주세요.
+UPSTAGE_API_KEY = os.getenv("UPSTAGE_API_KEY") # .env 파일에서 API KEY를 읽어옵니다.
 
 client = OpenAI(
     api_key=UPSTAGE_API_KEY,
