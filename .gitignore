@@ -1,3 +1,5 @@
 input/data/
 *.tar.gz
 .env
+checkpoint*/
+__pycache__/
