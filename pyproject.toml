@@ -5,9 +5,11 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10.13"
 dependencies = [
+    "accelerate>=0.26.0",
     "dotenv>=0.9.9",
     "openai>=1.97.1",
     "pandas>=2.3.1",
+    "python-dotenv>=1.1.1",
     "pytorch-lightning>=2.5.2",
     "pyyaml>=6.0.2",
     "rouge>=1.0.1",
