@@ -8,6 +8,11 @@ dependencies = [
     "dotenv>=0.9.9",
     "openai>=1.97.1",
     "pandas>=2.3.1",
+    "pytorch-lightning>=2.5.2",
+    "pyyaml>=6.0.2",
     "rouge>=1.0.1",
+    "torch>=2.7.1",
     "tqdm>=4.67.1",
+    "transformers>=4.54.0",
+    "wandb>=0.21.0",
 ]
