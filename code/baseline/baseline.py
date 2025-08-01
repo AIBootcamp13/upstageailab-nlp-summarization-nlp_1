@@ -51,147 +51,140 @@ from dotenv import load_dotenv
 load_dotenv() # .env 파일 로드
 
 
-# wandb 사용 여부 확인하고 비활성화
-use_wandb = os.getenv('USE_WANDB', '').lower() == 'true'
-if not use_wandb:
-    # wandb를 완전히 비활성화
-    os.environ['WANDB_DISABLED'] = 'true'
-
-log.info("""### 2) Config file 만들기 (선택)
-- 모델 생성에 필요한 다양한 매개변수 정보를 저장할 수 있습니다.  
-  따라서, 코드 상에서 모델의 매개변수를 설정할 수도 있지만 독립적인 매개변수 정보 파일을 생성하여 관리할 수 있습니다.
-""")
-
-
-# config 설정에 tokenizer 모듈이 사용되므로 미리 tokenizer를 정의해줍니다.
-tokenizer = AutoTokenizer.from_pretrained("digit82/kobart-summarization")
-
-config_data = {
-    "general": {
-        "data_path": "../../input/data/", # 모델 생성에 필요한 데이터 경로를 사용자 환경에 맞게 지정합니다.
-        "model_name": "digit82/kobart-summarization", # 불러올 모델의 이름을 사용자 환경에 맞게 지정할 수 있습니다.
-        "output_dir": "./" # 모델의 최종 출력 값을 저장할 경로를 설정합니다.
-    },
-    "tokenizer": {
-        "encoder_max_len": 512,
-        "decoder_max_len": 100,
-        "bos_token": f"{tokenizer.bos_token}",
-        "eos_token": f"{tokenizer.eos_token}",
-        # 특정 단어들이 분해되어 tokenization이 수행되지 않도록 special_tokens을 지정해줍니다.
-        "special_tokens": ['#Person1#', '#Person2#', '#Person3#', '#PhoneNumber#', '#Address#', '#PassportNumber#']
-    },
-    "training": {
-        "overwrite_output_dir": True,
-        "num_train_epochs": 20,
-        "learning_rate": 1e-5,
-        "per_device_train_batch_size": 50,
-        "per_device_eval_batch_size": 32,
-        "warmup_ratio": 0.1,
-        "weight_decay": 0.01,
-        "lr_scheduler_type": 'cosine',
-        "optim": 'adamw_torch',
-        "gradient_accumulation_steps": 1,
-        "evaluation_strategy": 'epoch',
-        "save_strategy": 'epoch',
-        "save_total_limit": 5,
-        "fp16": True,
-        "load_best_model_at_end": True,
-        "seed": 42,
-        "logging_dir": "./logs",
-        "logging_strategy": "epoch",
-        "predict_with_generate": True,
-        "generation_max_length": 100,
-        "do_train": True,
-        "do_eval": True,
-        "early_stopping_patience": 3,
-        "early_stopping_threshold": 0.001,
-        "report_to": "wandb" # (선택) wandb를 사용할 때 설정합니다.
-    },
-    # (선택) wandb 홈페이지에 가입하여 얻은 정보를 기반으로 작성합니다.
-    "wandb": {
-        "entity": os.getenv("WANDB_ENTITY", "wandb_repo"),
-        "project": os.getenv("WANDB_PROJECT", "project_name"),
-        "name": os.getenv("WANDB_RUN_NAME", "run_name")
-    },
-    "inference": {
-        "ckt_path": "model ckt path", # 사전 학습이 진행된 모델의 checkpoint를 저장할 경로를 설정합니다.
-        "result_path": "./prediction/",
-        "no_repeat_ngram_size": 2,
-        "early_stopping": True,
-        "generate_max_length": 100,
-        "num_beams": 4,
-        "batch_size" : 32,
-        # 정확한 모델 평가를 위해 제거할 불필요한 생성 토큰들을 정의합니다.
-        "remove_tokens": ['<usr>', f"{tokenizer.bos_token}", f"{tokenizer.eos_token}", f"{tokenizer.pad_token}"]
+def create_default_config():
+    """기본 설정을 생성하는 함수"""
+    # config 설정에 tokenizer 모듈이 사용되므로 미리 tokenizer를 정의해줍니다.
+    tokenizer = AutoTokenizer.from_pretrained("digit82/kobart-summarization")
+    
+    config_data = {
+        "general": {
+            "data_path": "../../input/data/", # 모델 생성에 필요한 데이터 경로를 사용자 환경에 맞게 지정합니다.
+            "model_name": "digit82/kobart-summarization", # 불러올 모델의 이름을 사용자 환경에 맞게 지정할 수 있습니다.
+            "output_dir": "./" # 모델의 최종 출력 값을 저장할 경로를 설정합니다.
+        },
+        "tokenizer": {
+            "encoder_max_len": 512,
+            "decoder_max_len": 100,
+            "bos_token": f"{tokenizer.bos_token}",
+            "eos_token": f"{tokenizer.eos_token}",
+            # 특정 단어들이 분해되어 tokenization이 수행되지 않도록 special_tokens을 지정해줍니다.
+            "special_tokens": ['#Person1#', '#Person2#', '#Person3#', '#PhoneNumber#', '#Address#', '#PassportNumber#']
+        },
+        "training": {
+            "overwrite_output_dir": True,
+            "num_train_epochs": 20,
+            "learning_rate": 1e-5,
+            "per_device_train_batch_size": 50,
+            "per_device_eval_batch_size": 32,
+            "warmup_ratio": 0.1,
+            "weight_decay": 0.01,
+            "lr_scheduler_type": 'cosine',
+            "optim": 'adamw_torch',
+            "gradient_accumulation_steps": 1,
+            "evaluation_strategy": 'epoch',
+            "save_strategy": 'epoch',
+            "save_total_limit": 5,
+            "fp16": True,
+            "load_best_model_at_end": True,
+            "seed": 42,
+            "logging_dir": "./logs",
+            "logging_strategy": "epoch",
+            "predict_with_generate": True,
+            "generation_max_length": 100,
+            "do_train": True,
+            "do_eval": True,
+            "early_stopping_patience": 3,
+            "early_stopping_threshold": 0.001,
+            "report_to": "wandb" # (선택) wandb를 사용할 때 설정합니다.
+        },
+        # (선택) wandb 홈페이지에 가입하여 얻은 정보를 기반으로 작성합니다.
+        "wandb": {
+            "entity": os.getenv("WANDB_ENTITY", "wandb_repo"),
+            "project": os.getenv("WANDB_PROJECT", "project_name"),
+            "name": os.getenv("WANDB_RUN_NAME", "run_name")
+        },
+        "inference": {
+            "ckt_path": "model ckt path", # 사전 학습이 진행된 모델의 checkpoint를 저장할 경로를 설정합니다.
+            "result_path": "./prediction/",
+            "no_repeat_ngram_size": 2,
+            "early_stopping": True,
+            "generate_max_length": 100,
+            "num_beams": 4,
+            "batch_size" : 32,
+            # 정확한 모델 평가를 위해 제거할 불필요한 생성 토큰들을 정의합니다.
+            "remove_tokens": ['<usr>', f"{tokenizer.bos_token}", f"{tokenizer.eos_token}", f"{tokenizer.pad_token}"]
+        }
     }
-}
+    return config_data
 
-log.info("""- 참고✅    
+def save_config(config_data, config_path="./config.yaml"):
+    """설정을 YAML 파일로 저장하는 함수"""
+    if not os.path.exists(config_path):
+        with open(config_path, "w") as file:
+            yaml.dump(config_data, file, allow_unicode=True)
+        log.info(f"새로운 config.yaml 파일을 생성했습니다: {config_path}")
+    else:
+        log.info(f"기존 config.yaml 파일을 사용합니다: {config_path}")
+
+
+def load_config(config_path="./config.yaml"):
+    """설정 파일을 로드하고 처리하는 함수"""
+    log.info("""- 참고✅    
 : wandb 라이브러리를 사용하기 위해선 entity, project, name를 지정해주어야 합니다. wandb 홈페이지에 가입한 후 얻은 정보를 입력하여 작동할 수 있습니다.
 """)
+    
+    # Config 파일이 없으면 생성
+    if not os.path.exists(config_path):
+        config_data = create_default_config()
+        save_config(config_data, config_path)
+    
+    log.info("""### 3) Configuration 불러오기""")
+    
+    # 저장된 config 파일을 불러옵니다.
+    with open(config_path, "r") as file:
+        loaded_config = yaml.safe_load(file)
+    
+    # 불러온 config 파일의 전체 내용을 확인합니다.
+    log.info(loaded_config)
+    
+    # wandb 사용 여부 확인하고 비활성화
+    use_wandb = os.getenv('USE_WANDB', '').lower() == 'true'
+    if not use_wandb:
+        # wandb를 완전히 비활성화
+        os.environ['WANDB_DISABLED'] = 'true'
+    
+    # (선택) 환경변수에서 wandb config 설정 업데이트
+    if loaded_config['training']['report_to'] == 'wandb' and use_wandb:
+        loaded_config['wandb']['entity'] = os.getenv('WANDB_ENTITY', loaded_config['wandb']['entity'])
+        loaded_config['wandb']['name'] = os.getenv('WANDB_RUN_NAME', loaded_config['wandb']['name'])
+        loaded_config['wandb']['project'] = os.getenv('WANDB_PROJECT', loaded_config['wandb']['project'])
+    else:
+        # wandb를 사용하지 않으므로 report_to를 None으로 변경
+        loaded_config['training']['report_to'] = None
+    
+    return loaded_config
 
-# 모델의 구성 정보를 YAML 파일로 저장합니다. (파일이 없을 때만)
-config_path = "./config.yaml"
-if not os.path.exists(config_path):
-    with open(config_path, "w") as file:
-        yaml.dump(config_data, file, allow_unicode=True)
-    log.info(f"새로운 config.yaml 파일을 생성했습니다: {config_path}")
-else:
-    log.info(f"기존 config.yaml 파일을 사용합니다: {config_path}")
-
-log.info("""### 3) Configuration 불러오기""")
-
-# 저장된 config 파일을 불러옵니다.
-config_path = "./config.yaml"
-
-with open(config_path, "r") as file:
-    loaded_config = yaml.safe_load(file)
-
-# 불러온 config 파일의 전체 내용을 확인합니다.
-log.info(loaded_config)
-
-# 실험에 쓰일 데이터의 경로, 사용될 모델, 모델의 최종 출력 결과를 저장할 경로에 대해 확인합니다.
-loaded_config['general']
-
-# 이곳에 사용자가 저장한 데이터 dir 설정하기
-# loaded_config['general']['data_path'] = "data_path"
-
-# 데이터 전처리를 하기 위해 tokenization 과정에서 필요한 정보들을 확인합니다.
-loaded_config['tokenizer']
-
-# 모델이 훈련 시 적용될 매개변수를 확인합니다.
-loaded_config['training']
-
-# 모델 학습 과정에 대한 정보를 제공해주는 wandb 설정 내용을 확인합니다.
-loaded_config['wandb']
-
-# (선택) 환경변수에서 wandb config 설정 업데이트
-if loaded_config['training']['report_to'] == 'wandb' and use_wandb:
-    loaded_config['wandb']['entity'] = os.getenv('WANDB_ENTITY', loaded_config['wandb']['entity'])
-    loaded_config['wandb']['name'] = os.getenv('WANDB_RUN_NAME', loaded_config['wandb']['name'])
-    loaded_config['wandb']['project'] = os.getenv('WANDB_PROJECT', loaded_config['wandb']['project'])
-else:
-    # wandb를 사용하지 않으므로 report_to를 None으로 변경
-    loaded_config['training']['report_to'] = None
-
-# 모델이 최종 결과를 출력하기 위한 매개변수 정보를 확인합니다.
-loaded_config['inference']
-
-log.info("""### 4) 데이터 불러와서 확인해보기
+def load_and_preview_data(config):
+    """데이터를 로드하고 미리보기하는 함수"""
+    log.info("""### 4) 데이터 불러와서 확인해보기
 - 실험에서 쓰일 데이터를 load하여 데이터의 구조와 내용을 살펴보겠습니다.
 - Train, dev, test 순서대로 12457, 499, 250개 씩 데이터가 구성되어 있습니다.
 """)
-
-# config에 저장된 데이터 경로를 통해 train과 validation data를 불러옵니다.
-data_path = loaded_config['general']['data_path']
-
-# train data의 구조와 내용을 확인합니다.
-train_df = pd.read_csv(os.path.join(data_path,'train.csv'))
-train_df.tail()
-
-# validation data의 구조와 내용을 확인합니다.
-val_df = pd.read_csv(os.path.join(data_path,'dev.csv'))
-val_df.tail()
+    
+    # config에 저장된 데이터 경로를 통해 train과 validation data를 불러옵니다.
+    data_path = config['general']['data_path']
+    
+    # train data의 구조와 내용을 확인합니다.
+    train_df = pd.read_csv(os.path.join(data_path,'train.csv'))
+    log.info("Train data tail:")
+    log.info(train_df.tail())
+    
+    # validation data의 구조와 내용을 확인합니다.
+    val_df = pd.read_csv(os.path.join(data_path,'dev.csv'))
+    log.info("Validation data tail:")
+    log.info(val_df.tail())
+    
+    return train_df, val_df
 
 log.info("""## 1. 데이터 가공 및 데이터셋 클래스 구축
 - csv file 을 불러와서 encoder 와 decoder의 입력형태로 가공해줍니다.
@@ -472,7 +465,8 @@ log.info("""## 3. 모델 학습하기
 - 앞에서 구축한 클래스 및 함수를 활용하여 학습 진행합니다.
 """)
 
-def main(config):
+def train_model(config):
+    """모델 학습을 수행하는 함수"""
     # 사용할 device를 정의합니다.
     device = torch.device('cuda:0' if torch.cuda.is_available()  else 'cpu')
     log.info('-'*10, f'device : {device}', '-'*10,)
@@ -496,30 +490,29 @@ def main(config):
     if config['training']['report_to'] == 'wandb' and use_wandb:
         wandb.finish()
 
-if __name__ == "__main__":
-    main(loaded_config)
-
-log.info("""## 4. 모델 추론하기""")
-
-# 학습 후 생성된 checkpoint에서 best model 찾기
-import json
-checkpoints = glob('./checkpoint-*')
-if checkpoints:
-    # 가장 최근 checkpoint의 trainer_state.json에서 best model 정보 읽기
-    latest_checkpoint = max(checkpoints, key=lambda x: int(x.split('-')[-1]))
-    with open(os.path.join(latest_checkpoint, 'trainer_state.json'), 'r') as f:
-        state = json.load(f)
-        loaded_config['inference']['ckt_path'] = state['best_model_checkpoint']
-        log.info(f"Best checkpoint 사용: {state['best_model_checkpoint']} (loss: {state['best_metric']:.4f})")
-else:
-    # checkpoint가 없으면 기본 모델 사용
-    loaded_config['inference']['ckt_path'] = loaded_config['general']['model_name']
-    log.info("checkpoint가 없어 기본 모델을 사용합니다.")
-
-log.info("""- test data를 사용하여 모델의 성능을 확인합니다.""")
+def find_best_checkpoint(config):
+    """최적의 checkpoint를 찾는 함수"""
+    log.info("""## 4. 모델 추론하기""")
+    
+    # 학습 후 생성된 checkpoint에서 best model 찾기
+    checkpoints = glob('./checkpoint-*')
+    if checkpoints:
+        # 가장 최근 checkpoint의 trainer_state.json에서 best model 정보 읽기
+        latest_checkpoint = max(checkpoints, key=lambda x: int(x.split('-')[-1]))
+        with open(os.path.join(latest_checkpoint, 'trainer_state.json'), 'r') as f:
+            state = json.load(f)
+            config['inference']['ckt_path'] = state['best_model_checkpoint']
+            log.info(f"Best checkpoint 사용: {state['best_model_checkpoint']} (loss: {state['best_metric']:.4f})")
+    else:
+        # checkpoint가 없으면 기본 모델 사용
+        config['inference']['ckt_path'] = config['general']['model_name']
+        log.info("checkpoint가 없어 기본 모델을 사용합니다.")
+    
+    return config
 
 # tokenization 과정까지 진행된 최종적으로 모델에 입력될 데이터를 출력합니다.
 def prepare_test_dataset(config,preprocessor, tokenizer):
+    log.info("""- test data를 사용하여 모델의 성능을 확인합니다.""")
 
     test_file_path = os.path.join(config['general']['data_path'],'test.csv')
 
@@ -609,9 +602,33 @@ def inference(config):
 
     return output
 
-# 학습된 모델의 test를 진행합니다.
-if __name__ == "__main__":
-    output = inference(loaded_config)
+def run_inference(config):
+    """추론을 실행하는 함수"""
+    output = inference(config)
+    log.info(output)  # 각 대화문에 대한 요약문이 출력됨을 확인할 수 있습니다.
+    return output
 
-log.info(output)  # 각 대화문에 대한 요약문이 출력됨을 확인할 수 있습니다.
+
+def main():
+    """전체 파이프라인을 실행하는 메인 함수"""
+    # Config 로드
+    config = load_config()
+    
+    # 데이터 미리보기
+    load_and_preview_data(config)
+    
+    # 학습 실행
+    train_model(config)
+    
+    # 최적 checkpoint 찾기
+    config = find_best_checkpoint(config)
+    
+    # 추론 실행
+    output = run_inference(config)
+    
+    return output
+
+
+if __name__ == "__main__":
+    main()
 
