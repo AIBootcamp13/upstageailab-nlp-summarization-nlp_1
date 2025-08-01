@@ -28,7 +28,6 @@ import pandas as pd
 import re
 import json
 import yaml
-from glob import glob
 from tqdm import tqdm
 from pprint import pprint
 
@@ -519,26 +518,10 @@ def train_model(config):
     use_train_tracking = os.getenv('WANDB_TRAIN_TRACKING', '').lower() == 'true'
     if config['training']['report_to'] == 'wandb' and use_train_tracking:
         wandb.finish()
+    
+    # 학습된 최상의 모델과 토크나이저 반환
+    return trainer.model, tokenizer
 
-def find_best_checkpoint(config):
-    """최적의 checkpoint를 찾는 함수"""
-    log.info("""## 4. 모델 추론하기""")
-    
-    # 학습 후 생성된 checkpoint에서 best model 찾기
-    checkpoints = glob('./checkpoint-*')
-    if checkpoints:
-        # 가장 최근 checkpoint의 trainer_state.json에서 best model 정보 읽기
-        latest_checkpoint = max(checkpoints, key=lambda x: int(x.split('-')[-1]))
-        with open(os.path.join(latest_checkpoint, 'trainer_state.json'), 'r') as f:
-            state = json.load(f)
-            config['inference']['ckt_path'] = state['best_model_checkpoint']
-            log.info(f"Best checkpoint 사용: {state['best_model_checkpoint']} (loss: {state['best_metric']:.4f})")
-    else:
-        # checkpoint가 없으면 기본 모델 사용
-        config['inference']['ckt_path'] = config['general']['model_name']
-        log.info("checkpoint가 없어 기본 모델을 사용합니다.")
-    
-    return config
 
 # tokenization 과정까지 진행된 최종적으로 모델에 입력될 데이터를 출력합니다.
 def prepare_test_dataset(config,preprocessor, tokenizer):
@@ -585,12 +568,17 @@ def load_tokenizer_and_model_for_test(config,device):
     return generate_model , tokenizer
 
 # 학습된 모델이 생성한 요약문의 출력 결과를 보여줍니다.
-def inference(config):
+def inference(config, model=None, tokenizer=None):
     device = torch.device('cuda:0' if torch.cuda.is_available()  else 'cpu')
     log.info('-'*10, f'device : {device}', '-'*10,)
     log.info(torch.__version__)
 
-    generate_model , tokenizer = load_tokenizer_and_model_for_test(config,device)
+    # 모델과 토크나이저가 전달되면 사용, 아니면 기존 로직 사용 (하위 호환성)
+    if model is not None and tokenizer is not None:
+        generate_model = model
+        log.info('-'*10, 'Using provided model and tokenizer', '-'*10,)
+    else:
+        generate_model , tokenizer = load_tokenizer_and_model_for_test(config,device)
 
     data_path = config['general']['data_path']
     preprocessor = Preprocess(config['tokenizer']['bos_token'], config['tokenizer']['eos_token'])
@@ -632,9 +620,9 @@ def inference(config):
 
     return output
 
-def run_inference(config):
+def run_inference(config, model=None, tokenizer=None):
     """추론을 실행하는 함수"""
-    output = inference(config)
+    output = inference(config, model=model, tokenizer=tokenizer)
     log.info(output)  # 각 대화문에 대한 요약문이 출력됨을 확인할 수 있습니다.
     return output
 
@@ -647,14 +635,11 @@ def main():
     # 데이터 미리보기
     load_and_preview_data(config)
     
-    # 학습 실행
-    train_model(config)
+    # 학습 실행 및 최상의 모델 획득
+    model, tokenizer = train_model(config)
     
-    # 최적 checkpoint 찾기
-    config = find_best_checkpoint(config)
-    
-    # 추론 실행
-    output = run_inference(config)
+    # 추론 실행 (학습된 최상의 모델 사용)
+    output = run_inference(config, model=model, tokenizer=tokenizer)
     
     return output
 
