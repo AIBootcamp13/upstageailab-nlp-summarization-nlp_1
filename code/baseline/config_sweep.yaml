@@ -6,59 +6,56 @@ metric:
 
 parameters:
   # Training hyperparameters
-  training.learning_rate:
-    distribution: log_uniform_values
-    min: 1e-6
-    max: 5e-4
+  "training.learning_rate":
+    min: 0.000001
+    max: 0.0005
+    distribution: log_uniform
     
-  training.per_device_train_batch_size:
+  "training.per_device_train_batch_size":
     values: [16, 32, 48, 64]
     
-  training.num_train_epochs:
-    distribution: int_uniform
+  "training.num_train_epochs":
     min: 10
     max: 30
+    distribution: int_uniform
     
-  training.warmup_ratio:
-    distribution: uniform
+  "training.warmup_ratio":
     min: 0.0
     max: 0.2
-    
-  training.weight_decay:
     distribution: uniform
+    
+  "training.weight_decay":
     min: 0.0
     max: 0.1
+    distribution: uniform
     
-  training.lr_scheduler_type:
-    values: [cosine, linear, polynomial]
+  "training.lr_scheduler_type":
+    values: ["cosine", "linear", "polynomial"]
     
-  training.gradient_accumulation_steps:
+  "training.gradient_accumulation_steps":
     values: [1, 2, 4]
     
-  training.optim:
-    values: [adamw_torch, adamw_hf, adam]
+  "training.optim":
+    values: ["adamw_torch", "adamw_torch_fused", "adafactor"]
     
   # Generation hyperparameters
-  inference.num_beams:
+  "inference.num_beams":
     values: [2, 4, 6, 8]
     
-  inference.no_repeat_ngram_size:
+  "inference.no_repeat_ngram_size":
     values: [2, 3, 4]
     
-  inference.generate_max_length:
+  "inference.generate_max_length":
     values: [80, 100, 120]
     
   # Tokenizer parameters
-  tokenizer.encoder_max_len:
+  "tokenizer.encoder_max_len":
     values: [384, 512, 640]
     
-  tokenizer.decoder_max_len:
+  "tokenizer.decoder_max_len":
     values: [80, 100, 120]
 
-# Early stopping configuration
-early_stopping:
-  type: hyperband
-  min_iter: 3
+# Note: Early stopping is handled by the training script, not by WandB sweep configuration
   
 # Command to run
 command:

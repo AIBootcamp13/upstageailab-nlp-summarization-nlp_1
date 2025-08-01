@@ -57,6 +57,11 @@ def setup_wandb_login():
     Returns:
         bool: 로그인 성공 여부
     """
+    # 이미 wandb가 초기화되어 있으면 로그인 시도하지 않음
+    if wandb.run is not None:
+        log.info("wandb가 이미 초기화되어 있습니다. 로그인을 건너뜁니다.")
+        return True
+        
     api_key = os.getenv('WANDB_API_KEY')
     if not api_key or api_key == 'your_wandb_api_key_here':
         log.info("WANDB_API_KEY가 설정되지 않았습니다. wandb 로그인을 건너뜁니다.")
@@ -441,8 +446,8 @@ def load_trainer_for_train(config,generate_model,tokenizer,train_inputs_dataset,
             log.warning("wandb 로그인 실패로 인해 wandb tracking이 비활성화됩니다.")
             config['training']['report_to'] = None
 
-        # (선택) 모델 checkpoint를 wandb에 저장하도록 환경 변수를 설정합니다.
-        os.environ["WANDB_LOG_MODEL"]="true"
+        # 모델 checkpoint 아티팩트 업로드 비활성화 (스토리지 절약)
+        os.environ["WANDB_LOG_MODEL"]="false"
         os.environ["WANDB_WATCH"]="false"
 
     # Validation loss가 더 이상 개선되지 않을 때 학습을 중단시키는 EarlyStopping 기능을 사용합니다.
