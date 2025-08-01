@@ -6,8 +6,8 @@
 UPSTAGE_API_KEY=up_your_actual_api_key_here
 
 # WandB 설정 (모델 학습 추적용)
-# WandB 사용 여부 (true/false, 정의되지 않으면 false로 간주)
-USE_WANDB=false
+# WandB 훈련 추적 여부 (일반 학습 시, true/false, 정의되지 않으면 false로 간주)
+WANDB_TRAIN_TRACKING=true
 
 # WandB API 키 (https://wandb.ai/settings 에서 발급)
 WANDB_API_KEY=your_wandb_api_key_here
@@ -20,5 +20,6 @@ WANDB_RUN_NAME=your_wandb_run_name_here
 # 사용법:
 # 1. 이 파일을 .env로 복사: cp env_template.txt .env
 # 2. .env 파일에서 your_actual_*_here를 실제 값으로 변경
-# 3. WandB를 사용하지 않으려면 USE_WANDB=false로 설정하거나 해당 라인을 삭제
-# 4. .env 파일은 git에 커밋하지 마세요 (.gitignore에 추가됨)
+# 3. WandB 훈련 추적을 사용하지 않으려면 WANDB_TRAIN_TRACKING=false로 설정하거나 해당 라인을 삭제
+# 4. WandB sweep을 사용하려면 WANDB_API_KEY는 반드시 설정해야 함
+# 5. .env 파일은 git에 커밋하지 마세요 (.gitignore에 추가됨)

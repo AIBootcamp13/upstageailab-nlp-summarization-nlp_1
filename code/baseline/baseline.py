@@ -50,6 +50,26 @@ class LoggingCallback(TrainerCallback):
 from dotenv import load_dotenv
 load_dotenv() # .env 파일 로드
 
+def setup_wandb_login():
+    """
+    wandb 로그인 처리 함수
+    
+    Returns:
+        bool: 로그인 성공 여부
+    """
+    api_key = os.getenv('WANDB_API_KEY')
+    if not api_key or api_key == 'your_wandb_api_key_here':
+        log.info("WANDB_API_KEY가 설정되지 않았습니다. wandb 로그인을 건너뜁니다.")
+        return False
+    
+    try:
+        wandb.login(key=api_key)
+        log.info("wandb 로그인 성공")
+        return True
+    except Exception as e:
+        log.error(f"wandb 로그인 실패: {e}")
+        return False
+
 
 def create_default_config():
     """기본 설정을 생성하는 함수"""
@@ -147,14 +167,14 @@ def load_config(config_path="./config.yaml"):
     # 불러온 config 파일의 전체 내용을 확인합니다.
     log.info(loaded_config)
     
-    # wandb 사용 여부 확인하고 비활성화
-    use_wandb = os.getenv('USE_WANDB', '').lower() == 'true'
-    if not use_wandb:
+    # wandb 훈련 추적 사용 여부 확인하고 비활성화
+    use_train_tracking = os.getenv('WANDB_TRAIN_TRACKING', '').lower() == 'true'
+    if not use_train_tracking:
         # wandb를 완전히 비활성화
         os.environ['WANDB_DISABLED'] = 'true'
     
     # (선택) 환경변수에서 wandb config 설정 업데이트
-    if loaded_config['training']['report_to'] == 'wandb' and use_wandb:
+    if loaded_config['training']['report_to'] == 'wandb' and use_train_tracking:
         loaded_config['wandb']['entity'] = os.getenv('WANDB_ENTITY', loaded_config['wandb']['entity'])
         loaded_config['wandb']['name'] = os.getenv('WANDB_RUN_NAME', loaded_config['wandb']['name'])
         loaded_config['wandb']['project'] = os.getenv('WANDB_PROJECT', loaded_config['wandb']['project'])
@@ -408,13 +428,18 @@ def load_trainer_for_train(config,generate_model,tokenizer,train_inputs_dataset,
             )
 
     # (선택) 모델의 학습 과정을 추적하는 wandb를 사용하기 위해 초기화 해줍니다.
-    use_wandb = os.getenv('USE_WANDB', '').lower() == 'true'
-    if config['training']['report_to'] == 'wandb' and use_wandb:
-        wandb.init(
-            entity=config['wandb']['entity'],
-            project=config['wandb']['project'],
-            name=config['wandb']['name'],
-        )
+    use_train_tracking = os.getenv('WANDB_TRAIN_TRACKING', '').lower() == 'true'
+    if config['training']['report_to'] == 'wandb' and use_train_tracking:
+        # wandb 로그인 처리
+        if setup_wandb_login():
+            wandb.init(
+                entity=config['wandb']['entity'],
+                project=config['wandb']['project'],
+                name=config['wandb']['name'],
+            )
+        else:
+            log.warning("wandb 로그인 실패로 인해 wandb tracking이 비활성화됩니다.")
+            config['training']['report_to'] = None
 
         # (선택) 모델 checkpoint를 wandb에 저장하도록 환경 변수를 설정합니다.
         os.environ["WANDB_LOG_MODEL"]="true"
@@ -486,8 +511,8 @@ def train_model(config):
     trainer.train()   # 모델 학습을 시작합니다.
 
     # (선택) 모델 학습이 완료된 후 wandb를 종료합니다.
-    use_wandb = os.getenv('USE_WANDB', '').lower() == 'true'
-    if config['training']['report_to'] == 'wandb' and use_wandb:
+    use_train_tracking = os.getenv('WANDB_TRAIN_TRACKING', '').lower() == 'true'
+    if config['training']['report_to'] == 'wandb' and use_train_tracking:
         wandb.finish()
 
 def find_best_checkpoint(config):
