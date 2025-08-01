@@ -27,7 +27,10 @@ from baseline import (
     prepare_train_dataset,
     Preprocess,
     compute_metrics,
-    setup_wandb_login
+    setup_wandb_login,
+    inference,
+    load_tokenizer_and_model_for_test,
+    prepare_test_dataset
 )
 
 def update_config_from_sweep(base_config, sweep_config):
@@ -160,6 +163,40 @@ def train_sweep():
         
         # 모델 학습을 시작합니다.
         trainer.train()
+        
+        # 학습 완료 후 테스트 데이터로 추론 실행
+        try:
+            print("학습 완료. 테스트 데이터로 추론을 시작합니다...")
+            
+            # 추론용 모델과 토크나이저 로드 (최상의 모델 사용)
+            inference_model, inference_tokenizer = load_tokenizer_and_model_for_test(config, device)
+            
+            # 테스트 데이터셋 준비
+            test_data, test_encoder_inputs_dataset = prepare_test_dataset(config, preprocessor, tokenizer)
+            
+            # 추론 실행 (기존 inference 함수 사용)
+            output_df = inference(config)
+            
+            # WandB 아티팩트로 결과 업로드
+            artifact = wandb.Artifact(
+                name="inference_results",
+                type="predictions",
+                description="Test dataset inference results"
+            )
+            
+            # output.csv 파일 경로
+            output_path = os.path.join(config['inference']['result_path'], "output.csv")
+            
+            if os.path.exists(output_path):
+                artifact.add_file(output_path)
+                wandb.log_artifact(artifact)
+                print(f"추론 결과를 WandB 아티팩트로 업로드했습니다: {output_path}")
+            else:
+                print(f"추론 결과 파일이 존재하지 않습니다: {output_path}")
+                
+        except Exception as inference_error:
+            print(f"추론 중 오류가 발생했습니다: {inference_error}")
+            # 추론 실패해도 학습은 성공했으므로 계속 진행
         
     except Exception as e:
         print(f"Training failed with error: {e}")
