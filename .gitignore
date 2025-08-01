@@ -3,3 +3,4 @@ input/data/
 .env
 checkpoint*/
 __pycache__/
+.DS_Store

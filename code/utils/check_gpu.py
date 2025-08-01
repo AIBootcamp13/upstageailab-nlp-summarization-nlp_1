@@ -1,5 +1,3 @@
-
-
 import torch
 
 def check_gpu():
