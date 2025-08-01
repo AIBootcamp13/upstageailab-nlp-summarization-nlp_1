@@ -431,21 +431,8 @@ def load_trainer_for_train(config,generate_model,tokenizer,train_inputs_dataset,
                 report_to=config['training']['report_to'] # (선택) wandb를 사용할 때 설정합니다.
             )
 
-    # (선택) 모델의 학습 과정을 추적하는 wandb를 사용하기 위해 초기화 해줍니다.
-    use_train_tracking = os.getenv('WANDB_TRAIN_TRACKING', '').lower() == 'true'
-    if config['training']['report_to'] == 'wandb' and use_train_tracking:
-        # wandb 로그인 처리
-        if setup_wandb_login():
-            wandb.init(
-                entity=config['wandb']['entity'],
-                project=config['wandb']['project'],
-                name=config['wandb']['name'],
-            )
-        else:
-            log.warning("wandb 로그인 실패로 인해 wandb tracking이 비활성화됩니다.")
-            config['training']['report_to'] = None
-
-        # 모델 checkpoint 아티팩트 업로드 비활성화 (스토리지 절약)
+    # wandb 사용 시 모델 checkpoint 아티팩트 업로드 비활성화 (스토리지 절약)
+    if config['training']['report_to'] == 'wandb':
         os.environ["WANDB_LOG_MODEL"]="false"
         os.environ["WANDB_WATCH"]="false"
 
@@ -514,10 +501,6 @@ def train_model(config):
     trainer = load_trainer_for_train(config, generate_model,tokenizer,train_inputs_dataset,val_inputs_dataset)
     trainer.train()   # 모델 학습을 시작합니다.
 
-    # (선택) 모델 학습이 완료된 후 wandb를 종료합니다.
-    use_train_tracking = os.getenv('WANDB_TRAIN_TRACKING', '').lower() == 'true'
-    if config['training']['report_to'] == 'wandb' and use_train_tracking:
-        wandb.finish()
     
     # 학습된 최상의 모델과 토크나이저 반환
     return trainer.model, tokenizer
@@ -618,6 +601,7 @@ def inference(config, model=None, tokenizer=None):
         os.makedirs(result_path)
     output_path = os.path.join(result_path, "output.csv")
     output.to_csv(output_path, index=False)
+    log.info(f"추론 결과를 {output_path}에 저장했습니다.")
 
     # WandB 아티팩트 업로드 (조건부)
     try:
@@ -650,16 +634,44 @@ def main():
     # Config 로드
     config = load_config()
     
-    # 데이터 미리보기
-    load_and_preview_data(config)
+    # WandB 세션 관리
+    use_train_tracking = os.getenv('WANDB_TRAIN_TRACKING', '').lower() == 'true'
+    wandb_initialized = False
     
-    # 학습 실행 및 최상의 모델 획득
-    model, tokenizer = train_model(config)
-    
-    # 추론 실행 (학습된 최상의 모델 사용)
-    output = run_inference(config, model=model, tokenizer=tokenizer)
-    
-    return output
+    try:
+        # 데이터 미리보기
+        load_and_preview_data(config)
+        
+        # WandB 초기화 (필요한 경우)
+        if config['training']['report_to'] == 'wandb' and use_train_tracking:
+            if setup_wandb_login():
+                wandb.init(
+                    entity=config['wandb']['entity'],
+                    project=config['wandb']['project'],
+                    name=config['wandb']['name'],
+                )
+                wandb_initialized = True
+                log.info("WandB 세션이 초기화되었습니다.")
+            else:
+                log.warning("wandb 로그인 실패로 인해 wandb tracking이 비활성화됩니다.")
+                config['training']['report_to'] = None
+        
+        # 학습 실행 및 최상의 모델 획득
+        model, tokenizer = train_model(config)
+        
+        # 추론 실행 (학습된 최상의 모델 사용)
+        output = run_inference(config, model=model, tokenizer=tokenizer)
+        
+        return output
+        
+    finally:
+        # WandB 세션 안전하게 종료
+        if wandb_initialized:
+            try:
+                wandb.finish()
+                log.info("WandB 세션이 종료되었습니다.")
+            except Exception as e:
+                log.warning(f"WandB 세션 종료 중 오류 발생: {e}")
 
 
 if __name__ == "__main__":
