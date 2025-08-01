@@ -5,11 +5,10 @@ metric:
   goal: maximize        # ROUGE 점수이므로 최대화
 
 parameters:
-  # Training hyperparameters
   "training.learning_rate":
-    min: 0.000005
-    max: 0.0001
-    distribution: log_uniform
+    min: 0.00001
+    max: 0.0005
+    distribution: log_uniform_values
     
   "training.per_device_train_batch_size":
     values: [8, 16, 32, 48]
@@ -38,37 +37,28 @@ parameters:
   "training.optim":
     values: ["adamw_torch", "adamw_torch_fused", "adafactor"]
     
-  # Early Stopping parameters (성능에 직접 영향)
+  # Early Stopping parameters (성능에 직접 영향, 보수적 설정)
   "training.early_stopping_patience":
-    values: [2, 3, 4, 5]
+    values: [3, 4, 5]
     
   "training.early_stopping_threshold":
-    values: [0.0001, 0.001, 0.01]
+    values: [0.001, 0.01]
     
   # 수치 안정성 파라미터
   "training.fp16":
     values: [true, false]
     
-  # 생성 품질 파라미터
+  # 참고: inference 관련 파라미터(num_beams, no_repeat_ngram_size 등)는 
+  # 학습 시에는 사용되지 않으므로 하이퍼파라미터 스윕에서 제외
+    
   "training.generation_max_length":
     values: [80, 100, 120, 140]
     
-  # Generation hyperparameters
-  "inference.num_beams":
-    values: [2, 4, 6, 8]
-    
-  "inference.no_repeat_ngram_size":
-    values: [2, 3, 4]
-    
   "inference.generate_max_length":
-    values: [80, 100, 120]
-    
-  # Tokenizer parameters
-  "tokenizer.encoder_max_len":
-    values: [384, 512, 640]
+    values: [80, 100, 120, 140]
     
   "tokenizer.decoder_max_len":
-    values: [80, 100, 120]
+    values: [80, 100, 120, 140]
 
 # Note: Early stopping is handled by the training script, not by WandB sweep configuration
   
