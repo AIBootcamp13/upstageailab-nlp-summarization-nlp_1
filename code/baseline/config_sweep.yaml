@@ -39,10 +39,14 @@ parameters:
     
   # Early Stopping parameters (성능에 직접 영향, 보수적 설정)
   "training.early_stopping_patience":
-    values: [3, 4, 5]
+    min: 1
+    max: 10
+    distribution: int_uniform
     
   "training.early_stopping_threshold":
-    values: [0.001, 0.01]
+    min: 0.0001
+    max: 0.1
+    distribution: log_uniform_values
     
   # 수치 안정성 파라미터
   "training.fp16":
@@ -50,15 +54,27 @@ parameters:
     
   # 참고: inference 관련 파라미터(num_beams, no_repeat_ngram_size 등)는 
   # 학습 시에는 사용되지 않으므로 하이퍼파라미터 스윕에서 제외
+  
+  # 시퀀스 길이 파라미터: GPU Tensor Core 최적화를 위해 8의 배수로 제한 (q=8)
+  # FP16 사용 시 8의 배수 정렬이 메모리 코어레싱과 Tensor Core 활용도를 향상시켜 최대 2.6배 성능 개선 가능
     
   "training.generation_max_length":
-    values: [80, 100, 120, 140]
+    min: 48
+    max: 120
+    distribution: q_uniform
+    q: 8
     
   "inference.generate_max_length":
-    values: [80, 100, 120, 140]
+    min: 48
+    max: 120
+    distribution: q_uniform
+    q: 8
     
   "tokenizer.decoder_max_len":
-    values: [80, 100, 120, 140]
+    min: 48
+    max: 120
+    distribution: q_uniform
+    q: 8
 
 # Note: Early stopping is handled by the training script, not by WandB sweep configuration
   
