@@ -28,9 +28,7 @@ from baseline import (
     Preprocess,
     compute_metrics,
     setup_wandb_login,
-    inference,
-    load_tokenizer_and_model_for_test,
-    prepare_test_dataset
+    inference
 )
 
 def update_config_from_sweep(base_config, sweep_config):
@@ -168,14 +166,8 @@ def train_sweep():
         try:
             print("학습 완료. 테스트 데이터로 추론을 시작합니다...")
             
-            # 추론용 모델과 토크나이저 로드 (최상의 모델 사용)
-            inference_model, inference_tokenizer = load_tokenizer_and_model_for_test(config, device)
-            
-            # 테스트 데이터셋 준비
-            test_data, test_encoder_inputs_dataset = prepare_test_dataset(config, preprocessor, tokenizer)
-            
-            # 추론 실행 (기존 inference 함수 사용)
-            output_df = inference(config)
+            # 추론 실행 (학습된 최상의 모델과 토크나이저 사용)
+            output_df = inference(config, model=generate_model, tokenizer=tokenizer)
             
             # WandB 아티팩트로 결과 업로드
             artifact = wandb.Artifact(
