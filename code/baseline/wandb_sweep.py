@@ -224,9 +224,18 @@ if __name__ == "__main__":
         else:
             # 새로운 sweep 생성
             print(f"Creating new sweep from {args.sweep_config}...")
-            sweep_id = create_sweep_from_yaml(args.sweep_config, args.project)
-            print(f"Created sweep with ID: {sweep_id}")
-            print(f"To resume this sweep later, add 'WANDB_SWEEP_ID={sweep_id}' to your .env file")
+            
+            # WandB가 빈 WANDB_SWEEP_ID 환경변수를 감지하지 않도록 임시 제거
+            temp_sweep_id = os.environ.pop('WANDB_SWEEP_ID', None)
+            
+            try:
+                sweep_id = create_sweep_from_yaml(args.sweep_config, args.project)
+                print(f"Created sweep with ID: {sweep_id}")
+                print(f"To resume this sweep later, add 'WANDB_SWEEP_ID={sweep_id}' to your .env file")
+            finally:
+                # 원래 환경변수 복원 (있었다면)
+                if temp_sweep_id is not None:
+                    os.environ['WANDB_SWEEP_ID'] = temp_sweep_id
     
     # sweep agent 실행
     wandb.agent(
