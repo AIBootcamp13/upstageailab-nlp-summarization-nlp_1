@@ -167,24 +167,8 @@ def train_sweep():
             print("학습 완료. 테스트 데이터로 추론을 시작합니다...")
             
             # 추론 실행 (학습된 최상의 모델과 토크나이저 사용)
+            # inference() 함수 내부에서 자동으로 WandB 아티팩트 업로드됨
             output_df = inference(config, model=generate_model, tokenizer=tokenizer)
-            
-            # WandB 아티팩트로 결과 업로드
-            artifact = wandb.Artifact(
-                name="inference_results",
-                type="predictions",
-                description="Test dataset inference results"
-            )
-            
-            # output.csv 파일 경로
-            output_path = os.path.join(config['inference']['result_path'], "output.csv")
-            
-            if os.path.exists(output_path):
-                artifact.add_file(output_path)
-                wandb.log_artifact(artifact)
-                print(f"추론 결과를 WandB 아티팩트로 업로드했습니다: {output_path}")
-            else:
-                print(f"추론 결과 파일이 존재하지 않습니다: {output_path}")
                 
         except Exception as inference_error:
             print(f"추론 중 오류가 발생했습니다: {inference_error}")
