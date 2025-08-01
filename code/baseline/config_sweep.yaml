@@ -1,0 +1,68 @@
+# WandB Sweep Configuration for Hyperparameter Tuning
+method: bayes  # 베이지안 최적화로 효율적인 탐색
+metric:
+  name: eval_rouge_avg  # ROUGE-1, ROUGE-2, ROUGE-L의 평균값
+  goal: maximize        # ROUGE 점수이므로 최대화
+
+parameters:
+  # Training hyperparameters
+  training.learning_rate:
+    distribution: log_uniform_values
+    min: 1e-6
+    max: 5e-4
+    
+  training.per_device_train_batch_size:
+    values: [16, 32, 48, 64]
+    
+  training.num_train_epochs:
+    distribution: int_uniform
+    min: 10
+    max: 30
+    
+  training.warmup_ratio:
+    distribution: uniform
+    min: 0.0
+    max: 0.2
+    
+  training.weight_decay:
+    distribution: uniform
+    min: 0.0
+    max: 0.1
+    
+  training.lr_scheduler_type:
+    values: [cosine, linear, polynomial]
+    
+  training.gradient_accumulation_steps:
+    values: [1, 2, 4]
+    
+  training.optim:
+    values: [adamw_torch, adamw_hf, adam]
+    
+  # Generation hyperparameters
+  inference.num_beams:
+    values: [2, 4, 6, 8]
+    
+  inference.no_repeat_ngram_size:
+    values: [2, 3, 4]
+    
+  inference.generate_max_length:
+    values: [80, 100, 120]
+    
+  # Tokenizer parameters
+  tokenizer.encoder_max_len:
+    values: [384, 512, 640]
+    
+  tokenizer.decoder_max_len:
+    values: [80, 100, 120]
+
+# Early stopping configuration
+early_stopping:
+  type: hyperband
+  min_iter: 3
+  
+# Command to run
+command:
+  - ${env}
+  - python
+  - wandb_sweep.py
+  - ${args}
