@@ -616,7 +616,25 @@ def inference(config, model=None, tokenizer=None):
     result_path = config['inference']['result_path']
     if not os.path.exists(result_path):
         os.makedirs(result_path)
-    output.to_csv(os.path.join(result_path, "output.csv"), index=False)
+    output_path = os.path.join(result_path, "output.csv")
+    output.to_csv(output_path, index=False)
+
+    # WandB 아티팩트 업로드 (조건부)
+    try:
+        if wandb.run is not None:
+            artifact = wandb.Artifact(
+                name="inference_results",
+                type="predictions", 
+                description="Test dataset inference results"
+            )
+            artifact.add_file(output_path)
+            wandb.log_artifact(artifact)
+            log.info(f"추론 결과를 WandB 아티팩트로 업로드했습니다: {output_path}")
+    except NameError:
+        # wandb가 임포트되지 않은 경우 무시
+        pass
+    except Exception as e:
+        log.warning(f"WandB 아티팩트 업로드 중 오류 발생: {e}")
 
     return output
 
