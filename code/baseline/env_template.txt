@@ -17,9 +17,21 @@ WANDB_ENTITY=your_wandb_entity_here
 WANDB_PROJECT=your_wandb_project_here
 WANDB_RUN_NAME=your_wandb_run_name_here
 
+# WandB Sweep 설정 (선택사항)
+# 기존 sweep를 재개하려면 sweep ID를 설정하세요
+# 예: WANDB_SWEEP_ID=312gzoif
+# 설정하지 않으면 새로운 sweep가 생성됩니다
+WANDB_SWEEP_ID=
+
+# WandB 아티팩트 업로드 제어 (선택사항)
+# 모델 체크포인트를 아티팩트로 업로드할지 여부 (true/false)
+# false로 설정하면 스토리지 사용량을 절약할 수 있습니다
+WANDB_UPLOAD_ARTIFACTS=false
+
 # 사용법:
 # 1. 이 파일을 .env로 복사: cp env_template.txt .env
 # 2. .env 파일에서 your_actual_*_here를 실제 값으로 변경
 # 3. WandB 훈련 추적을 사용하지 않으려면 WANDB_TRAIN_TRACKING=false로 설정하거나 해당 라인을 삭제
 # 4. WandB sweep을 사용하려면 WANDB_API_KEY는 반드시 설정해야 함
-# 5. .env 파일은 git에 커밋하지 마세요 (.gitignore에 추가됨)
+# 5. 기존 sweep를 재개하려면 WANDB_SWEEP_ID에 sweep ID를 설정
+# 6. .env 파일은 git에 커밋하지 마세요 (.gitignore에 추가됨)

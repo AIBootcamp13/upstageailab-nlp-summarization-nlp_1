@@ -4,3 +4,4 @@ input/data/
 checkpoint*/
 __pycache__/
 .DS_Store
+wandb/

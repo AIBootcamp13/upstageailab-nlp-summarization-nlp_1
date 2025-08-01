@@ -1,28 +1,30 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+# 스크립트 파일이 있는 디렉토리를 현재 작업 디렉토리로 설정
+import os; os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
 # 사용방법
 # 새 sweep 생성 후 5개 실험 실행
 # python wandb_sweep.py --count 5
 # 기존 sweep ID로 추가 실험 실행
 # python wandb_sweep.py --sweep_id YOUR_SWEEP_ID --count 3
-
-
-import os
 import sys
 import yaml
 import wandb
 import torch
 from copy import deepcopy
+from dotenv import load_dotenv
+
+# .env 파일 로드
+load_dotenv()
 
 # baseline.py에서 리팩토링된 함수들 임포트
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from baseline import (
     load_config,
-    train_model,
     load_tokenizer_and_model_for_train,
     prepare_train_dataset,
-    load_trainer_for_train,
     Preprocess,
     compute_metrics,
     setup_wandb_login
@@ -70,8 +72,12 @@ def train_sweep():
     """
     WandB sweep 실행을 위한 훈련 함수
     """
-    # wandb 초기화
-    run = wandb.init()
+    # sweep에서는 항상 wandb를 사용하므로 먼저 로그인 처리
+    if not setup_wandb_login():
+        raise ValueError("wandb sweep을 사용하려면 WANDB_API_KEY가 필요합니다. .env 파일을 확인하세요.")
+    
+    # wandb 초기화 (로그인 후)
+    wandb.init()
     
     # sweep 설정 가져오기
     sweep_config = wandb.config
@@ -81,10 +87,6 @@ def train_sweep():
     
     # 기본 config를 sweep 파라미터로 업데이트
     config = update_config_from_sweep(base_config, sweep_config)
-    
-    # sweep에서는 항상 wandb를 사용하므로 로그인 처리
-    if not setup_wandb_login():
-        raise ValueError("wandb sweep을 사용하려면 WANDB_API_KEY가 필요합니다. .env 파일을 확인하세요.")
     
     # wandb 사용 설정
     config['training']['report_to'] = 'wandb'
@@ -136,8 +138,8 @@ def train_sweep():
         
         # wandb 초기화 (이미 위에서 했지만 확실히 하기 위해)
         if config['training']['report_to'] == 'wandb':
-            # wandb 설정
-            os.environ["WANDB_LOG_MODEL"] = "true"
+            # 아티팩트 업로드 비활성화 (스토리지 절약)
+            os.environ["WANDB_LOG_MODEL"] = "false"
             os.environ["WANDB_WATCH"] = "false"
         
         # EarlyStopping 콜백
@@ -209,14 +211,22 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
-    # sweep ID가 없으면 새로 생성
-    if args.sweep_id is None:
-        print(f"Creating new sweep from {args.sweep_config}...")
-        sweep_id = create_sweep_from_yaml(args.sweep_config, args.project)
-        print(f"Created sweep with ID: {sweep_id}")
-    else:
+    # sweep ID 결정 (우선순위: CLI 인자 > 환경변수 > 새로 생성)
+    if args.sweep_id is not None:
         sweep_id = args.sweep_id
-        print(f"Using existing sweep ID: {sweep_id}")
+        print(f"Using sweep ID from command line: {sweep_id}")
+    else:
+        # 환경변수에서 sweep ID 확인
+        env_sweep_id = os.getenv('WANDB_SWEEP_ID')
+        if env_sweep_id and env_sweep_id.strip():
+            sweep_id = env_sweep_id.strip()
+            print(f"Using sweep ID from environment variable: {sweep_id}")
+        else:
+            # 새로운 sweep 생성
+            print(f"Creating new sweep from {args.sweep_config}...")
+            sweep_id = create_sweep_from_yaml(args.sweep_config, args.project)
+            print(f"Created sweep with ID: {sweep_id}")
+            print(f"To resume this sweep later, add 'WANDB_SWEEP_ID={sweep_id}' to your .env file")
     
     # sweep agent 실행
     wandb.agent(
