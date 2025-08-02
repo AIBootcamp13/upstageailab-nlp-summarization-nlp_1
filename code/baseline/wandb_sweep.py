@@ -89,6 +89,12 @@ def train_sweep():
     # 기본 config를 sweep 파라미터로 업데이트
     config = update_config_from_sweep(base_config, sweep_config)
     
+    # 재현성을 위한 시드 설정
+    from baseline import set_seed_for_reproducibility
+    final_seed = config['training']['seed']  # sweep에서 업데이트된 시드 또는 기본값 42
+    set_seed_for_reproducibility(final_seed)
+    print(f"실험 시드 설정: {final_seed}")
+    
     # wandb 사용 설정
     config['training']['report_to'] = 'wandb'
     
