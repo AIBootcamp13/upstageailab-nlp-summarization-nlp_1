@@ -5,6 +5,11 @@ metric:
   goal: maximize        # ROUGE 점수이므로 최대화
 
 parameters:
+  "training.seed":
+    min: 1
+    max: 999999
+    distribution: int_uniform
+    
   "training.learning_rate":
     min: 0.00001
     max: 0.0005
