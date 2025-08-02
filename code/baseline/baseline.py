@@ -30,6 +30,8 @@ import json
 import yaml
 from tqdm import tqdm
 from pprint import pprint
+import random
+import numpy as np
 
 import torch
 import pytorch_lightning as pl
@@ -48,6 +50,46 @@ class LoggingCallback(TrainerCallback):
 
 from dotenv import load_dotenv
 load_dotenv() # .env 파일 로드
+
+def set_seed_for_reproducibility(seed=42):
+    """
+    완전한 재현성을 위한 시드 설정 함수
+    
+    Args:
+        seed (int): 설정할 시드 값
+    """
+    log.info(f"재현성을 위한 시드 설정: {seed}")
+    
+    # Python random 시드 설정
+    random.seed(seed)
+    
+    # NumPy random 시드 설정  
+    np.random.seed(seed)
+    
+    # PyTorch 시드 설정
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)  # multi-GPU인 경우
+    
+    # CUDA deterministic 모드 활성화
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    
+    # PyTorch Lightning 시드 설정
+    pl.seed_everything(seed, workers=True)
+    
+    # 환경 변수 설정
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    
+    # CUBLAS 환경 변수 설정 - CUDA 10.2 이상에서 필요
+    os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
+    
+    # PyTorch 결정론적 알고리즘 활성화
+    torch.use_deterministic_algorithms(True)
+    
+    log.info("CUBLAS_WORKSPACE_CONFIG 추가 설정 완료")
+    log.info("torch.use_deterministic_algorithms(True) 설정 완료")
+    log.info("모든 라이브러리에 대한 시드 설정이 완료되었습니다.")
 
 def setup_wandb_login():
     """
@@ -633,6 +675,10 @@ def main():
     """전체 파이프라인을 실행하는 메인 함수"""
     # Config 로드
     config = load_config()
+    
+    # 재현성을 위한 시드 설정 (config에서 시드 값 가져오기)
+    seed = config['training']['seed']
+    set_seed_for_reproducibility(seed)
     
     # WandB 세션 관리
     use_train_tracking = os.getenv('WANDB_TRAIN_TRACKING', '').lower() == 'true'
