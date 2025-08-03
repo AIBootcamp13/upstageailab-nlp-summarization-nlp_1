@@ -43,9 +43,12 @@ parameters:
     values: ["adamw_torch", "adamw_torch_fused", "adafactor"]
     
   # Early Stopping parameters (성능에 직접 영향, 보수적 설정)
+  "training.use_early_stopping":
+    values: [true, false]
+    
   "training.early_stopping_patience":
     min: 1
-    max: 10
+    max: 20
     distribution: int_uniform
     
   "training.early_stopping_threshold":
@@ -93,7 +96,7 @@ parameters:
     
   # Beam Search 파라미터: 품질과 속도의 균형을 위한 빔 개수 설정
   "inference.num_beams":
-    values: [1, 2, 4, 6, 8]
+    values: [4, 6, 8, 10, 12]
 
 # Note: Early stopping is handled by the training script, not by WandB sweep configuration
   
