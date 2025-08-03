@@ -32,6 +32,7 @@ training:
   do_train: true
   early_stopping_patience: 3
   early_stopping_threshold: 0.001
+  use_early_stopping: true
   evaluation_strategy: epoch
   fp16: true
   generation_max_length: 100
@@ -41,7 +42,7 @@ training:
   logging_dir: ./logs
   logging_strategy: epoch
   lr_scheduler_type: cosine
-  num_train_epochs: 20
+  num_train_epochs: 1
   optim: adamw_torch
   overwrite_output_dir: true
   per_device_eval_batch_size: 32

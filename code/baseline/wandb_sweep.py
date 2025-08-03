@@ -149,11 +149,19 @@ def train_sweep():
             os.environ["WANDB_LOG_MODEL"] = "false"
             os.environ["WANDB_WATCH"] = "false"
         
-        # EarlyStopping 콜백
-        early_stopping_callback = EarlyStoppingCallback(
-            early_stopping_patience=config['training']['early_stopping_patience'],
-            early_stopping_threshold=config['training']['early_stopping_threshold']
-        )
+        # 콜백 리스트 초기화
+        callbacks = [LoggingCallback()]
+        
+        # 얼리스탑 사용 여부에 따라 조건부 추가
+        if config['training'].get('use_early_stopping', True):
+            early_stopping_callback = EarlyStoppingCallback(
+                early_stopping_patience=config['training']['early_stopping_patience'],
+                early_stopping_threshold=config['training']['early_stopping_threshold']
+            )
+            callbacks.append(early_stopping_callback)
+            print(f"Early stopping 활성화: patience={config['training']['early_stopping_patience']}, threshold={config['training']['early_stopping_threshold']}")
+        else:
+            print("Early stopping 비활성화")
         
         # Trainer 클래스를 정의합니다.
         trainer = Seq2SeqTrainer(
@@ -162,7 +170,7 @@ def train_sweep():
             train_dataset=train_inputs_dataset,
             eval_dataset=val_inputs_dataset,
             compute_metrics=lambda pred: compute_metrics_with_avg(config, tokenizer, pred),
-            callbacks=[early_stopping_callback, LoggingCallback()]
+            callbacks=callbacks
         )
         
         # 모델 학습을 시작합니다.
