@@ -555,6 +555,13 @@ def save_model_package(model, tokenizer, config, save_dir="models"):
         log.info("토크나이저 저장 완료")
         
         # 3. 설정 파일 저장
+        log.info("저장할 config 내용:")
+        log.info(f"  generation_max_length: {config['training']['generation_max_length']}")
+        log.info(f"  encoder_max_len: {config['tokenizer']['encoder_max_len']}")
+        log.info(f"  decoder_max_len: {config['tokenizer']['decoder_max_len']}")
+        log.info(f"  learning_rate: {config['training']['learning_rate']}")
+        log.info(f"  seed: {config['training']['seed']}")
+        
         with open(os.path.join(temp_dir, "config.yaml"), "w", encoding='utf-8') as f:
             yaml.dump(config, f, allow_unicode=True)
         log.info("설정 파일 저장 완료")
