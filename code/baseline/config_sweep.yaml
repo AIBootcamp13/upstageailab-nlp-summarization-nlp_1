@@ -1,7 +1,7 @@
 # WandB Sweep Configuration for Hyperparameter Tuning
 method: bayes  # 베이지안 최적화로 효율적인 탐색
 metric:
-  name: eval/rouge_avg  # ROUGE-1, ROUGE-2, ROUGE-L의 평균값 (실제 로그되는 메트릭 이름과 일치)
+  name: eval/rouge-1    # 사용 가능한 ROUGE 메트릭: eval/rouge-1, eval/rouge-2, eval/rouge-l, eval/rouge_avg
   goal: maximize        # ROUGE 점수이므로 최대화
 
 parameters:
