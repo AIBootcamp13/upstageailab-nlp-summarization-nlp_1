@@ -32,6 +32,10 @@ from tqdm import tqdm
 from pprint import pprint
 import random
 import numpy as np
+import shutil
+import zipfile
+import time
+from datetime import datetime
 
 import torch
 import pytorch_lightning as pl
@@ -518,6 +522,87 @@ def load_tokenizer_and_model_for_train(config,device):
     log.info('-'*10, 'Load tokenizer & model complete', '-'*10,)
     return generate_model , tokenizer
 
+def save_model_package(model, tokenizer, config, save_dir="models"):
+    """
+    모델, 토크나이저, 설정을 ZIP으로 패키징하여 저장
+    
+    Args:
+        model: 학습된 모델
+        tokenizer: 토크나이저
+        config: 설정 딕셔너리
+        save_dir: 저장할 디렉토리
+    
+    Returns:
+        tuple: (zip_path, metadata)
+    """
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"model_baseline_{timestamp}.zip"
+    
+    # 임시 폴더 생성
+    temp_dir = f"temp_{timestamp}"
+    os.makedirs(temp_dir, exist_ok=True)
+    
+    try:
+        log.info(f"모델 패키징 시작: {filename}")
+        
+        # 1. 모델 저장 (safetensors 형식)
+        model.save_pretrained(temp_dir, safe_serialization=True)
+        log.info("모델 저장 완료")
+        
+        # 2. 토크나이저 저장
+        tokenizer_dir = os.path.join(temp_dir, "tokenizer")
+        tokenizer.save_pretrained(tokenizer_dir)
+        log.info("토크나이저 저장 완료")
+        
+        # 3. 설정 파일 저장
+        with open(os.path.join(temp_dir, "config.yaml"), "w", encoding='utf-8') as f:
+            yaml.dump(config, f, allow_unicode=True)
+        log.info("설정 파일 저장 완료")
+            
+        # 4. 메타데이터 저장
+        metadata = {
+            "timestamp": timestamp,
+            "model_info": {
+                "model_name": config['general']['model_name'],
+                "vocab_size": len(tokenizer)
+            }
+        }
+        
+        # WandB 정보 추가 (있으면)
+        try:
+            if wandb.run is not None:
+                metadata.update({
+                    "wandb_run_id": wandb.run.id,
+                    "wandb_run_name": wandb.run.name,
+                    "wandb_run_url": wandb.run.url
+                })
+                log.info(f"WandB 정보 추가: {wandb.run.id}")
+        except NameError:
+            # wandb가 임포트되지 않은 경우 무시
+            pass
+            
+        with open(os.path.join(temp_dir, "metadata.json"), "w", encoding='utf-8') as f:
+            json.dump(metadata, f, indent=2, ensure_ascii=False)
+        log.info("메타데이터 저장 완료")
+        
+        # 5. ZIP 압축
+        os.makedirs(save_dir, exist_ok=True)
+        zip_path = os.path.join(save_dir, filename)
+        shutil.make_archive(zip_path[:-4], 'zip', temp_dir)
+        log.info(f"ZIP 압축 완료: {zip_path}")
+        
+        return zip_path, metadata
+        
+    except Exception as e:
+        log.error(f"모델 패키징 중 오류 발생: {e}")
+        raise
+        
+    finally:
+        # 임시 폴더 삭제
+        if os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            log.info("임시 폴더 정리 완료")
+
 log.info("""## 3. 모델 학습하기
 
 - 앞에서 구축한 클래스 및 함수를 활용하여 학습 진행합니다.
@@ -543,6 +628,13 @@ def train_model(config):
     trainer = load_trainer_for_train(config, generate_model,tokenizer,train_inputs_dataset,val_inputs_dataset)
     trainer.train()   # 모델 학습을 시작합니다.
 
+    # 학습 완료 후 모델을 ZIP으로 패키징하여 저장
+    try:
+        zip_path, metadata = save_model_package(trainer.model, tokenizer, config)
+        log.info(f"모델이 ZIP 파일로 저장되었습니다: {zip_path}")
+        log.info(f"메타데이터: {metadata}")
+    except Exception as e:
+        log.warning(f"모델 패키징 중 오류 발생하지만 학습은 완료됨: {e}")
     
     # 학습된 최상의 모델과 토크나이저 반환
     return trainer.model, tokenizer
