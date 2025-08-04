@@ -7,12 +7,21 @@ import os; os.chdir(os.path.dirname(os.path.abspath(__file__)))
 # 사용방법
 # 새 sweep 생성 후 5개 실험 실행
 # python wandb_sweep.py --count 5
+
 # 기존 sweep ID로 추가 실험 실행
 # python wandb_sweep.py --sweep_id YOUR_SWEEP_ID --count 3
+
+# 파라미터 오버라이드 (특정 값 고정)
+# python wandb_sweep.py --count 1 --override training.num_train_epochs=1
+
+# 여러 파라미터 동시 고정
+# python wandb_sweep.py --count 5 \
+#     --override training.learning_rate=5e-5 \
+#     --override training.num_train_epochs=10 \
+#     --override training.warmup_ratio=0.1
 import sys
 import yaml
 import wandb
-import torch
 from copy import deepcopy
 from dotenv import load_dotenv
 
@@ -23,12 +32,10 @@ load_dotenv()
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from baseline import (
     load_config,
-    load_tokenizer_and_model_for_train,
-    prepare_train_dataset,
-    Preprocess,
     compute_metrics,
     setup_wandb_login,
-    inference
+    inference,
+    train_model
 )
 
 def update_config_from_sweep(base_config, sweep_config):
@@ -58,7 +65,7 @@ def update_config_from_sweep(base_config, sweep_config):
 
 def compute_metrics_with_avg(config, tokenizer, pred):
     """
-    ROUGE 점수를 계산하고 평균값을 추가하는 함수
+    ROUGE 점수를 계산하고 평균값을 추가하는 함수 (WandB sweep용)
     """
     # 기본 ROUGE 점수 계산
     result = compute_metrics(config, tokenizer, pred)
@@ -69,9 +76,68 @@ def compute_metrics_with_avg(config, tokenizer, pred):
     
     return result
 
+def convert_parameter_value(value_str):
+    """
+    문자열 값을 적절한 타입으로 변환하는 함수
+    
+    Args:
+        value_str: 변환할 문자열 값
+        
+    Returns:
+        변환된 값 (int, float, bool, str)
+    """
+    # boolean 값 처리
+    if value_str.lower() in ['true', 'false']:
+        return value_str.lower() == 'true'
+    
+    # 숫자 값 처리
+    try:
+        # 정수인지 확인
+        if '.' not in value_str and 'e' not in value_str.lower():
+            return int(value_str)
+        # 실수로 처리
+        return float(value_str)
+    except ValueError:
+        # 문자열로 처리
+        return value_str
+
+def apply_parameter_overrides(sweep_config, overrides):
+    """
+    sweep 설정에 파라미터 오버라이드를 적용하는 함수
+    
+    Args:
+        sweep_config: WandB sweep 설정 딕셔너리
+        overrides: 오버라이드할 파라미터 리스트 (예: ['training.learning_rate=1e-4'])
+    """
+    if not overrides:
+        return
+    
+    print(f"파라미터 오버라이드 적용: {len(overrides)}개")
+    
+    for override in overrides:
+        if '=' not in override:
+            print(f"잘못된 오버라이드 형식 (건너뜀): {override}")
+            continue
+            
+        key, value_str = override.split('=', 1)
+        key = key.strip()
+        value_str = value_str.strip()
+        
+        # 값 타입 변환
+        converted_value = convert_parameter_value(value_str)
+        
+        # sweep 설정에서 해당 파라미터를 고정값으로 변경
+        if key in sweep_config.get('parameters', {}):
+            old_config = sweep_config['parameters'][key]
+            sweep_config['parameters'][key] = {'value': converted_value}
+            print(f"  {key}: {old_config} → 고정값: {converted_value}")
+        else:
+            print(f"  {key}: 새 파라미터로 추가: {converted_value}")
+            sweep_config.setdefault('parameters', {})[key] = {'value': converted_value}
+
 def train_sweep():
     """
-    WandB sweep 실행을 위한 훈련 함수
+    WandB sweep 실행을 위한 훈련 함수 (baseline.py의 train_model 사용)
     """
     # sweep에서는 항상 wandb를 사용하므로 먼저 로그인 처리
     if not setup_wandb_login():
@@ -89,6 +155,14 @@ def train_sweep():
     # 기본 config를 sweep 파라미터로 업데이트
     config = update_config_from_sweep(base_config, sweep_config)
     
+    # 업데이트된 config 출력
+    print("업데이트된 config 파라미터:")
+    print(f"  generation_max_length: {config['training']['generation_max_length']}")
+    print(f"  encoder_max_len: {config['tokenizer']['encoder_max_len']}")
+    print(f"  decoder_max_len: {config['tokenizer']['decoder_max_len']}")
+    print(f"  learning_rate: {config['training']['learning_rate']}")
+    print(f"  seed: {config['training']['seed']}")
+    
     # 재현성을 위한 시드 설정
     from baseline import set_seed_for_reproducibility
     final_seed = config['training']['seed']  # sweep에서 업데이트된 시드 또는 기본값 42
@@ -98,83 +172,14 @@ def train_sweep():
     # wandb 사용 설정
     config['training']['report_to'] = 'wandb'
     
-    # 메인 훈련 함수 실행
+    # compute_metrics를 sweep용 함수로 교체 (원복 불필요)
+    import baseline
+    baseline.compute_metrics = compute_metrics_with_avg
+    
     try:
-        # 사용할 device를 정의합니다.
-        device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-        
-        # 사용할 모델과 tokenizer를 불러옵니다.
-        generate_model, tokenizer = load_tokenizer_and_model_for_train(config, device)
-        
-        # 학습에 사용할 데이터셋을 불러옵니다.
-        preprocessor = Preprocess(config['tokenizer']['bos_token'], config['tokenizer']['eos_token'])
-        data_path = config['general']['data_path']
-        train_inputs_dataset, val_inputs_dataset = prepare_train_dataset(config, preprocessor, data_path, tokenizer)
-        
-        # Trainer 클래스를 불러옵니다. (compute_metrics_with_avg 사용)
-        from transformers import Seq2SeqTrainingArguments, Seq2SeqTrainer, EarlyStoppingCallback
-        from baseline import LoggingCallback
-        
-        # set training args
-        training_args = Seq2SeqTrainingArguments(
-            output_dir=config['general']['output_dir'],
-            overwrite_output_dir=config['training']['overwrite_output_dir'],
-            num_train_epochs=config['training']['num_train_epochs'],
-            learning_rate=config['training']['learning_rate'],
-            per_device_train_batch_size=config['training']['per_device_train_batch_size'],
-            per_device_eval_batch_size=config['training']['per_device_eval_batch_size'],
-            warmup_ratio=config['training']['warmup_ratio'],
-            weight_decay=config['training']['weight_decay'],
-            lr_scheduler_type=config['training']['lr_scheduler_type'],
-            optim=config['training']['optim'],
-            gradient_accumulation_steps=config['training']['gradient_accumulation_steps'],
-            eval_strategy=config['training']['evaluation_strategy'],
-            save_strategy=config['training']['save_strategy'],
-            save_total_limit=config['training']['save_total_limit'],
-            fp16=config['training']['fp16'],
-            load_best_model_at_end=config['training']['load_best_model_at_end'],
-            seed=config['training']['seed'],
-            logging_dir=config['training']['logging_dir'],
-            logging_strategy=config['training']['logging_strategy'],
-            predict_with_generate=config['training']['predict_with_generate'],
-            generation_max_length=config['training']['generation_max_length'],
-            do_train=config['training']['do_train'],
-            do_eval=config['training']['do_eval'],
-            report_to=config['training']['report_to']
-        )
-        
-        # wandb 초기화 (이미 위에서 했지만 확실히 하기 위해)
-        if config['training']['report_to'] == 'wandb':
-            # 아티팩트 업로드 비활성화 (스토리지 절약)
-            os.environ["WANDB_LOG_MODEL"] = "false"
-            os.environ["WANDB_WATCH"] = "false"
-        
-        # 콜백 리스트 초기화
-        callbacks = [LoggingCallback()]
-        
-        # 얼리스탑 사용 여부에 따라 조건부 추가
-        if config['training'].get('use_early_stopping', True):
-            early_stopping_callback = EarlyStoppingCallback(
-                early_stopping_patience=config['training']['early_stopping_patience'],
-                early_stopping_threshold=config['training']['early_stopping_threshold']
-            )
-            callbacks.append(early_stopping_callback)
-            print(f"Early stopping 활성화: patience={config['training']['early_stopping_patience']}, threshold={config['training']['early_stopping_threshold']}")
-        else:
-            print("Early stopping 비활성화")
-        
-        # Trainer 클래스를 정의합니다.
-        trainer = Seq2SeqTrainer(
-            model=generate_model,
-            args=training_args,
-            train_dataset=train_inputs_dataset,
-            eval_dataset=val_inputs_dataset,
-            compute_metrics=lambda pred: compute_metrics_with_avg(config, tokenizer, pred),
-            callbacks=callbacks
-        )
-        
-        # 모델 학습을 시작합니다.
-        trainer.train()
+        # baseline.py의 train_model 함수 사용 (자동으로 모델 저장됨)
+        model, tokenizer = train_model(config)
+        print("baseline.py의 train_model 함수를 통한 학습 및 모델 저장 완료")
         
         # 학습 완료 후 테스트 데이터로 추론 실행
         try:
@@ -182,7 +187,7 @@ def train_sweep():
             
             # 추론 실행 (학습된 최상의 모델과 토크나이저 사용)
             # inference() 함수 내부에서 자동으로 WandB 아티팩트 업로드됨
-            output_df = inference(config, model=generate_model, tokenizer=tokenizer)
+            inference(config, model=model, tokenizer=tokenizer)
                 
         except Exception as inference_error:
             print(f"추론 중 오류가 발생했습니다: {inference_error}")
@@ -196,13 +201,14 @@ def train_sweep():
     # 정상 종료
     wandb.finish()
 
-def create_sweep_from_yaml(yaml_path="config_sweep.yaml", project_name=None):
+def create_sweep_from_yaml(yaml_path="config_sweep.yaml", project_name=None, overrides=None):
     """
     YAML 파일에서 sweep 설정을 읽어와 sweep 생성
     
     Args:
         yaml_path: sweep 설정 YAML 파일 경로
         project_name: wandb 프로젝트 이름 (None이면 config에서 읽음)
+        overrides: 오버라이드할 파라미터 리스트
     
     Returns:
         sweep_id
@@ -210,6 +216,10 @@ def create_sweep_from_yaml(yaml_path="config_sweep.yaml", project_name=None):
     # sweep 설정 읽기
     with open(yaml_path, 'r') as f:
         sweep_config = yaml.safe_load(f)
+    
+    # 파라미터 오버라이드 적용
+    if overrides:
+        apply_parameter_overrides(sweep_config, overrides)
     
     # 프로젝트 이름 설정
     if project_name is None:
@@ -235,8 +245,14 @@ if __name__ == "__main__":
                         help='실행할 sweep 실험 수')
     parser.add_argument('--project', type=str, default=None,
                         help='WandB 프로젝트 이름')
+    parser.add_argument('--override', action='append', default=[],
+                        help='파라미터 오버라이드 (예: training.learning_rate=1e-4)')
     
     args = parser.parse_args()
+    
+    # 오버라이드 파라미터 출력
+    if args.override:
+        print(f"파라미터 오버라이드: {args.override}")
     
     # sweep ID 결정 (우선순위: CLI 인자 > 환경변수 > 새로 생성)
     if args.sweep_id is not None:
@@ -256,7 +272,7 @@ if __name__ == "__main__":
             temp_sweep_id = os.environ.pop('WANDB_SWEEP_ID', None)
             
             try:
-                sweep_id = create_sweep_from_yaml(args.sweep_config, args.project)
+                sweep_id = create_sweep_from_yaml(args.sweep_config, args.project, args.override)
                 print(f"Created sweep with ID: {sweep_id}")
                 print(f"To resume this sweep later, add 'WANDB_SWEEP_ID={sweep_id}' to your .env file")
             finally:
