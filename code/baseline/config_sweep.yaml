@@ -64,29 +64,25 @@ parameters:
   # FP16 사용 시 8의 배수 정렬이 메모리 코어레싱과 Tensor Core 활용도를 향상시켜 최대 2.6배 성능 개선 가능
     
   "training.generation_max_length":
-    min: 48
+    min: 40
     max: 120
-    distribution: q_uniform
-    q: 8
+    distribution: int_uniform
     
   "inference.generate_max_length":
-    min: 48
+    min: 40
     max: 120
-    distribution: q_uniform
-    q: 8
+    distribution: int_uniform
     
   "tokenizer.decoder_max_len":
-    min: 48
+    min: 40
     max: 120
-    distribution: q_uniform
-    q: 8
+    distribution: int_uniform
     
   # 입력 텍스트 최대 길이: 메모리 사용량과 처리 성능의 균형점 탐색
   "tokenizer.encoder_max_len":
     min: 256
     max: 768
-    distribution: q_uniform
-    q: 8
+    distribution: int_uniform
     
   # 반복 n-gram 방지 파라미터: 텍스트 품질 향상을 위한 중요한 설정
   "inference.no_repeat_ngram_size":
