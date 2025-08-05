@@ -23,8 +23,6 @@ Original file is located at
 - 필요한 라이브러리를 설치한 후 불러옵니다.
 """)
 
-# !pip install openai
-
 import pandas as pd
 import os
 import time
@@ -41,7 +39,7 @@ load_dotenv()
 
 # API 파라미터 글로벌 설정
 params = {
-    "model": "9",  # 사용 가능한 모델 후보 : solar-pro2, solar-pro, solar-mini, solar-pro-nightly, solar-mini-nightly, solar-1-mini-chat
+    "model": "solar-1-mini-chat",  # 사용가능한 모델 후보 : solar-pro2, solar-pro, solar-mini, solar-pro-nightly, solar-mini-nightly, solar-1-mini-chat
     "temperature": 0.2,
     "top_p": 0.3,
     "few_shot_count": 1  # 퓨샷 예제 개수
@@ -63,32 +61,6 @@ client = OpenAI(
     base_url="https://api.upstage.ai/v1/solar"
 )
 
-log.info("""### 3) Solar Chat API 사용해보기 (선택)
-- 예시 코드를 통해 Solar Chat API를 사용해보세요.
-""")
-
-stream = client.chat.completions.create(
-    model=params["model"],
-    messages=[
-      {
-        "role": "system",
-        "content": "You are a helpful assistant."
-      },
-      {
-        "role": "user",
-        "content": "Hello!"
-      }
-    ],
-    stream=True,
-)
-
-for chunk in stream:
-    if chunk.choices[0].delta.content is not None:
-        print(chunk.choices[0].delta.content, end="")
-
-# Use with stream=False
-# log.info(stream.choices[0].message.content)
-
 log.info("""### 4) 데이터 불러오기
 - 실험에서 쓰일 데이터를 load합니다.
 """)
@@ -105,10 +77,6 @@ train_df.tail()
 val_df = pd.read_csv(os.path.join(DATA_PATH,'dev.csv'))
 val_df.tail()
 
-log.info("""## 1. Solar Chat API 요약 성능 확인하기
-- Solar Chat API을 이용하여 train 및 validation dataset에 포함된 dialogue 샘플을 요약해 봅니다.
-""")
-
 # 모델 성능에 대한 평가 지표를 정의합니다. 본 대회에서는 ROUGE 점수를 통해 모델의 성능을 평가합니다.
 rouge = Rouge()
 def compute_metrics(pred, gold):
@@ -116,300 +84,544 @@ def compute_metrics(pred, gold):
     result = {key: value["f"] for key, value in results.items()}
     return result
 
-# Dialogue를 입력으로 받아, Solar Chat API에 보낼 Prompt를 생성하는 함수를 정의합니다.
-def build_prompt(dialogue):
-    system_prompt = "You are an expert in the field of dialogue summarization. Please summarize the following dialogue."
-
-    user_prompt = f"Dialogue:\n{dialogue}\n\nSummary:\n"
-
-    return [
-        {
-            "role": "system",
-            "content": system_prompt
-        },
-        {
-            "role": "user",
-            "content": user_prompt
-        }
-    ]
-
-# Solar Chat API를 활용해 Summarization을 수행하는 함수를 정의합니다.
-def summarization(dialogue):
-    summary = client.chat.completions.create(
-        model=params["model"],
-        messages=build_prompt(dialogue),
-    )
-
-    return summary.choices[0].message.content
-
-log.info("""### (선택) parameter 변경하기
-- Solar Chat API를 사용할 때, parameter를 변경하여, 다양한 결과를 얻을 수 있습니다.
-- Parameter에 대한 자세한 설명은 [여기](https://developers.upstage.ai/docs/apis/chat#request-body)를 참고해주세요.
+def test_api_connection():
+    """API 연결 테스트를 위한 Hello 예제"""
+    log.info("""### 3) Solar Chat API 사용해보기 (선택)
+- 예시 코드를 통해 Solar Chat API를 사용해보세요.
 """)
 
-def summarization(dialogue):
-    # params에서 None이 아닌 값들만 사용
-    api_params = {k: v for k, v in params.items() if v is not None}
-    api_params["messages"] = build_prompt(dialogue)
+    stream = client.chat.completions.create(
+        model=params["model"],
+        messages=[
+          {
+            "role": "system",
+            "content": "You are a helpful assistant."
+          },
+          {
+            "role": "user",
+            "content": "Hello!"
+          }
+        ],
+        stream=True,
+    )
+
+    for chunk in stream:
+        if chunk.choices[0].delta.content is not None:
+            print(chunk.choices[0].delta.content, end="")
+
+def run_basic_method():
+    """기본 방식 - 퓨샷 없는 기본 요약"""
+    log.info("""## 1. Solar Chat API 요약 성능 확인하기 (기본 방식)
+- Solar Chat API을 이용하여 train 및 validation dataset에 포함된 dialogue 샘플을 요약해 봅니다.
+""")
+
+    # 기본 방식용 build_prompt 함수
+    def build_prompt_basic(dialogue):
+        system_prompt = "You are an expert in the field of dialogue summarization. Please summarize the following dialogue."
+        user_prompt = f"Dialogue:\n{dialogue}\n\nSummary:\n"
+        return [
+            {
+                "role": "system", 
+                "content": system_prompt
+            },
+            {
+                "role": "user",
+                "content": user_prompt
+            }
+        ]
+
+    # 기본 방식용 summarization 함수
+    def summarization_basic(dialogue):
+        api_params = {k: v for k, v in params.items() if v is not None and k != "few_shot_count"}
+        api_params["messages"] = build_prompt_basic(dialogue)
+        
+        summary = client.chat.completions.create(**api_params)
+        return summary.choices[0].message.content
+
+    log.info("""Train Dataset을 이용하여 요약이 잘 되는지 확인해 봅니다.""")
     
-    summary = client.chat.completions.create(**api_params)
+    # Train data 중 처음 3개의 대화를 요약합니다.
+    def test_on_train_data_basic(num_samples=3):
+        for idx, row in train_df[:num_samples].iterrows():
+            dialogue = row['dialogue']
+            summary = summarization_basic(dialogue)
+            log.info(f"Dialogue:\n{dialogue}\n")
+            log.info(f"Pred Summary: {summary}\n")
+            log.info(f"Gold Summary: {row['summary']}\n")
+            log.info("=="*50)
 
-    return summary.choices[0].message.content
+    test_on_train_data_basic()
 
-log.info("""Train Dataset을 이용하여 요약이 잘 되는지 확인해 봅니다.""")
-
-# Train data 중 처음 3개의 대화를 요약합니다.
-def test_on_train_data(num_samples=3):
-    for idx, row in train_df[:num_samples].iterrows():
-        dialogue = row['dialogue']
-        summary = summarization(dialogue)
-        log.info(f"Dialogue:\n{dialogue}\n")
-        log.info(f"Pred Summary: {summary}\n")
-        log.info(f"Gold Summary: {row['summary']}\n")
-        log.info("=="*50)
-
-if __name__ == "__main__":
-    test_on_train_data()
-
-log.info("""Validation Dataset을 이용하여 요약을 진행하고, 성능을 평가해 봅니다.""")
-
-# Validation data의 대화를 요약하고, 점수를 측정합니다.
-def validate(num_samples=-1):
-    val_samples = val_df[:num_samples] if num_samples > 0 else val_df
-
-    # 기존 개별 점수 계산 방식 유지
-    scores = []
-    # 전체 배치 계산을 위한 리스트
-    all_predictions = []
-    all_labels = []
+    log.info("""Validation Dataset을 이용하여 요약을 진행하고, 성능을 평가해 봅니다.""")
     
-    for idx, row in tqdm(val_samples.iterrows(), total=len(val_samples)):
-        dialogue = row['dialogue']
-        summary = summarization(dialogue)
-        results = compute_metrics(summary, row['summary'])
-        avg_score = sum(results.values()) / len(results)
+    # Validation data의 대화를 요약하고, 점수를 측정합니다.
+    def validate_basic(num_samples=-1):
+        val_samples = val_df[:num_samples] if num_samples > 0 else val_df
 
-        scores.append(avg_score)
-        all_predictions.append(summary)
-        all_labels.append(row['summary'])
+        scores = []
+        all_predictions = []
+        all_labels = []
+        
+        for idx, row in tqdm(val_samples.iterrows(), total=len(val_samples)):
+            dialogue = row['dialogue']
+            summary = summarization_basic(dialogue)
+            results = compute_metrics(summary, row['summary'])
+            avg_score = sum(results.values()) / len(results)
 
-    # 기존 평균 점수 방식
-    val_avg_score = sum(scores) / len(scores)
-    log.info(f"Validation Average Score (개별 평균): {val_avg_score}")
-    
-    # baseline.py와 같은 방식의 상세한 ROUGE 분석
-    log.info("="*50)
-    log.info("상세한 ROUGE 메트릭 분석 (baseline.py 방식)")
-    log.info("="*50)
-    
-    # 정확한 평가를 위해 미리 정의된 불필요한 생성토큰들을 제거합니다.
-    # baseline.py의 remove_tokens와 동일하게 설정
-    remove_tokens = ['<usr>', '<s>', '</s>', '<pad>']
-    replaced_predictions = all_predictions.copy()
-    replaced_labels = all_labels.copy()
-    
-    for token in remove_tokens:
-        replaced_predictions = [sentence.replace(token, " ") for sentence in replaced_predictions]
-        replaced_labels = [sentence.replace(token, " ") for sentence in replaced_labels]
+            scores.append(avg_score)
+            all_predictions.append(summary)
+            all_labels.append(row['summary'])
 
-    # 예측 결과와 정답 샘플 출력 (처음 3개)
-    log.info('-'*150)
-    for i in range(min(3, len(replaced_predictions))):
-        log.info(f"PRED {i+1}: {replaced_predictions[i]}")
-        log.info(f"GOLD {i+1}: {replaced_labels[i]}")
+        val_avg_score = sum(scores) / len(scores)
+        log.info(f"기본 방식 - Validation Average Score (개별 평균): {val_avg_score}")
+        
+        # baseline.py와 같은 방식의 상세한 ROUGE 분석
+        log.info("="*50)
+        log.info("기본 방식 - 상세한 ROUGE 메트릭 분석")
+        log.info("="*50)
+        
+        remove_tokens = ['<usr>', '<s>', '</s>', '<pad>']
+        replaced_predictions = all_predictions.copy()
+        replaced_labels = all_labels.copy()
+        
+        for token in remove_tokens:
+            replaced_predictions = [sentence.replace(token, " ") for sentence in replaced_predictions]
+            replaced_labels = [sentence.replace(token, " ") for sentence in replaced_labels]
+
         log.info('-'*150)
+        for i in range(min(3, len(replaced_predictions))):
+            log.info(f"PRED {i+1}: {replaced_predictions[i]}")
+            log.info(f"GOLD {i+1}: {replaced_labels[i]}")
+            log.info('-'*150)
 
-    # 최종적인 ROUGE 점수를 계산합니다.
-    rouge_evaluator = Rouge()
-    results = rouge_evaluator.get_scores(replaced_predictions, replaced_labels, avg=True)
-    
-    # ROUGE 점수 결과를 로그에 출력
-    log.info('-'*150)
-    log.info("ROUGE Evaluation Results:")
-    for metric_name, metric_values in results.items():
-        log.info(f"{metric_name.upper()}: Precision={metric_values['p']:.4f}, Recall={metric_values['r']:.4f}, F1={metric_values['f']:.4f}")
-    
-    log.info('-'*150)
-    
-    # F1 점수들의 평균 계산
-    f1_scores = [value["f"] for value in results.values()]
-    batch_avg_score = sum(f1_scores) / len(f1_scores)
-    log.info(f"Validation Average Score (전체 배치): {batch_avg_score}")
-    
-    return val_avg_score, batch_avg_score
+        rouge_evaluator = Rouge()
+        results = rouge_evaluator.get_scores(replaced_predictions, replaced_labels, avg=True)
+        
+        log.info('-'*150)
+        log.info("기본 방식 - ROUGE Evaluation Results:")
+        for metric_name, metric_values in results.items():
+            log.info(f"{metric_name.upper()}: Precision={metric_values['p']:.4f}, Recall={metric_values['r']:.4f}, F1={metric_values['f']:.4f}")
+        
+        log.info('-'*150)
+        
+        f1_scores = [value["f"] for value in results.values()]
+        batch_avg_score = sum(f1_scores) / len(f1_scores)
+        log.info(f"기본 방식 - Validation Average Score (전체 배치): {batch_avg_score}")
+        
+        return val_avg_score, batch_avg_score
 
-if __name__ == "__main__":
-    validate(100) # 100개의 validation sample에 대한 요약을 수행합니다.
+    validate_basic(100)
 
-    # 전체 validation data에 대한 요약을 수행하고 싶은 경우 아래와 같이 실행합니다.
-    # validate()
-
-log.info("""## 2. Solar Chat API로 요약하기
+    log.info("""## 2. Solar Chat API로 요약하기 (기본 방식)
 - Solar Chat API을 이용하여 test dataset에 포함된 dialogue를 요약하고 제출용 파일을 생성합니다.
 """)
 
-def inference(output_filename="output_solar.csv"):
-    test_df = pd.read_csv(os.path.join(DATA_PATH, 'test.csv'))
+    def inference_basic(output_filename="output_solar.csv"):
+        test_df = pd.read_csv(os.path.join(DATA_PATH, 'test.csv'))
 
-    summary = []
-    start_time = time.time()
-    for idx, row in tqdm(test_df.iterrows(), total=len(test_df)):
-        dialogue = row['dialogue']
-        summary.append(summarization(dialogue))
+        summary = []
+        start_time = time.time()
+        for idx, row in tqdm(test_df.iterrows(), total=len(test_df)):
+            dialogue = row['dialogue']
+            summary.append(summarization_basic(dialogue))
 
-        # Rate limit 방지를 위해 1분 동안 최대 100개의 요청을 보내도록 합니다.
-        if (idx + 1) % 100 == 0:
-            end_time = time.time()
-            elapsed_time = end_time - start_time
+            # Rate limit 방지를 위해 1분 동안 최대 100개의 요청을 보내도록 합니다.
+            if (idx + 1) % 100 == 0:
+                end_time = time.time()
+                elapsed_time = end_time - start_time
 
-            if elapsed_time < 60:
-                wait_time = 60 - elapsed_time + 5
-                log.info(f"Elapsed time: {elapsed_time:.2f} sec")
-                log.info(f"Waiting for {wait_time} sec")
-                time.sleep(wait_time)
+                if elapsed_time < 60:
+                    wait_time = 60 - elapsed_time + 5
+                    log.info(f"Elapsed time: {elapsed_time:.2f} sec")
+                    log.info(f"Waiting for {wait_time} sec")
+                    time.sleep(wait_time)
 
-            start_time = time.time()
+                start_time = time.time()
 
-    output = pd.DataFrame(
-        {
-            "fname": test_df['fname'],
-            "summary" : summary,
-        }
-    )
+        output = pd.DataFrame(
+            {
+                "fname": test_df['fname'],
+                "summary" : summary,
+            }
+        )
 
-    if not os.path.exists(RESULT_PATH):
-        os.makedirs(RESULT_PATH)
-    output.to_csv(os.path.join(RESULT_PATH, output_filename), index=False)
+        if not os.path.exists(RESULT_PATH):
+            os.makedirs(RESULT_PATH)
+        output.to_csv(os.path.join(RESULT_PATH, output_filename), index=False)
 
-    return output
+        return output
 
-if __name__ == "__main__":
-    output = inference("output_solar.csv")
+    output = inference_basic("output_solar.csv")
+    log.info(output)
 
-log.info(output)  # 각 대화문에 대한 요약문이 출력됨을 확인할 수 있습니다.
-
-log.info("""## 3. Prompt Engineering
+def run_first_fewshot_method():
+    """첫 번째 퓨샷 방식 - 단일 user 메시지에 예제 포함"""
+    log.info("""## 3. Prompt Engineering (첫 번째 퓨샷)
 - Prompt engineering을 통해 요약 성능 향상을 시도합니다.
 """)
 
-# Few-shot prompt를 생성하기 위해, train data의 일부를 사용합니다.
-few_shot_samples = train_df.sample(params["few_shot_count"])
+    # Few-shot prompt를 생성하기 위해, train data의 일부를 사용합니다.
+    few_shot_samples = train_df.sample(params["few_shot_count"])
 
-# 퓨샷 샘플들을 리스트로 저장
-few_shot_dialogues = []
-few_shot_summaries = []
+    # 퓨샷 샘플들을 리스트로 저장
+    few_shot_dialogues = []
+    few_shot_summaries = []
 
-for i in range(len(few_shot_samples)):
-    dialogue = few_shot_samples.iloc[i]['dialogue']
-    summary = few_shot_samples.iloc[i]['summary']
-    few_shot_dialogues.append(dialogue)
-    few_shot_summaries.append(summary)
-    log.info(f"Sample Dialogue{i+1}:\n{dialogue}\n")
-    log.info(f"Sample Summary{i+1}: {summary}\n")
+    for i in range(len(few_shot_samples)):
+        dialogue = few_shot_samples.iloc[i]['dialogue']
+        summary = few_shot_samples.iloc[i]['summary']
+        few_shot_dialogues.append(dialogue)
+        few_shot_summaries.append(summary)
+        log.info(f"Sample Dialogue{i+1}:\n{dialogue}\n")
+        log.info(f"Sample Summary{i+1}: {summary}\n")
 
-# Prompt를 생성하는 함수를 수정합니다. (첫 번째 퓨샷 방식)
-def build_prompt(dialogue):
-    system_prompt = "You are a expert in the field of dialogue summarization, summarize the given dialogue in a concise manner. Follow the user's instruction carefully and provide a summary that is relevant to the dialogue."
+    # 첫 번째 퓨샷 방식용 build_prompt 함수
+    def build_prompt_fewshot1(dialogue):
+        system_prompt = "You are a expert in the field of dialogue summarization, summarize the given dialogue in a concise manner. Follow the user's instruction carefully and provide a summary that is relevant to the dialogue."
 
-    # 여러 퓨샷 예제들을 하나의 user 메시지에 포함
-    examples_text = ""
-    for i in range(len(few_shot_dialogues)):
-        examples_text += f"Sample Dialogue {i+1}:\n{few_shot_dialogues[i]}\n\n"
-        examples_text += f"Sample Summary {i+1}:\n{few_shot_summaries[i]}\n\n"
-    
-    user_prompt = (
-        "Following the instructions below, summarize the given document.\n"
-        "Instructions:\n"
-        f"1. Read the provided {len(few_shot_dialogues)} sample dialogue(s) and corresponding summary(ies).\n"
-        "2. Read the dialogue carefully.\n"
-        "3. Following the sample's style of summary, provide a concise summary of the given dialogue.\n\n"
-        f"{examples_text}"
-        "Dialogue:\n"
-        f"{dialogue}\n\n"
-        "Summary:\n"
-    )
-
-    return [
-        {
-            "role": "system",
-            "content": system_prompt
-        },
-        {
-            "role": "user",
-            "content": user_prompt
-        }
-    ]
-
-# 변경된 prompt를 사용하여, train data 중 처음 3개의 대화를 요약하고, 결과를 확인합니다.
-if __name__ == "__main__":
-    test_on_train_data()
-
-# 변경된 prompt를 사용하여, validation data의 대화를 요약하고, 점수를 측정합니다.
-if __name__ == "__main__":
-    validate(100)
-    
-# 첫 번째 퓨샷 방식으로 test dataset에 대한 추론을 수행합니다.
-if __name__ == "__main__":
-    output = inference("output_solar_fewshot1.csv")
-
-log.info("""다른 방식으로 Few-shot sample을 제공하여 Prompt를 구성해 봅니다.""")
-
-# Few-shot sample을 다른 방식으로 사용하여 prompt를 생성합니다. (두 번째 퓨샷 방식)
-def build_prompt(dialogue):
-    system_prompt = "You are a expert in the field of dialogue summarization, summarize the given dialogue in a concise manner. Follow the user's instruction carefully and provide a summary that is relevant to the dialogue."
-
-    # 메시지 리스트 시작
-    messages = [{"role": "system", "content": system_prompt}]
-    
-    # 여러 퓨샷 예제들을 assistant-user 대화 형태로 추가
-    for i in range(len(few_shot_dialogues)):
-        if i == 0:
-            # 첫 번째 예제는 instruction 포함
-            few_shot_user_prompt = (
-                "Following the instructions below, summarize the given document.\n"
-                "Instructions:\n"
-                "1. Read the provided sample dialogue and corresponding summary.\n"
-                "2. Read the dialogue carefully.\n"
-                "3. Following the sample's style of summary, provide a concise summary of the given dialogue. Be sure that the summary is simple but captures the essence of the dialogue.\n\n"
-                "Dialogue:\n"
-                f"{few_shot_dialogues[i]}\n\n"
-                "Summary:\n"
-            )
-        else:
-            # 이후 예제들은 dialogue만
-            few_shot_user_prompt = (
-                "Dialogue:\n"
-                f"{few_shot_dialogues[i]}\n\n"
-                "Summary:\n"
-            )
+        # 여러 퓨샷 예제들을 하나의 user 메시지에 포함
+        examples_text = ""
+        for i in range(len(few_shot_dialogues)):
+            examples_text += f"Sample Dialogue {i+1}:\n{few_shot_dialogues[i]}\n\n"
+            examples_text += f"Sample Summary {i+1}:\n{few_shot_summaries[i]}\n\n"
         
-        messages.append({"role": "user", "content": few_shot_user_prompt})
-        messages.append({"role": "assistant", "content": few_shot_summaries[i]})
+        user_prompt = (
+            "Following the instructions below, summarize the given document.\n"
+            "Instructions:\n"
+            f"1. Read the provided {len(few_shot_dialogues)} sample dialogue(s) and corresponding summary(ies).\n"
+            "2. Read the dialogue carefully.\n"
+            "3. Following the sample's style of summary, provide a concise summary of the given dialogue.\n\n"
+            f"{examples_text}"
+            "Dialogue:\n"
+            f"{dialogue}\n\n"
+            "Summary:\n"
+        )
 
-    # 실제 질문 추가
-    user_prompt = (
-        "Dialogue:\n"
-        f"{dialogue}\n\n"
-        "Summary:\n"
-    )
-    messages.append({"role": "user", "content": user_prompt})
+        return [
+            {
+                "role": "system",
+                "content": system_prompt
+            },
+            {
+                "role": "user",
+                "content": user_prompt
+            }
+        ]
 
-    return messages
+    # 첫 번째 퓨샷 방식용 summarization 함수
+    def summarization_fewshot1(dialogue):
+        api_params = {k: v for k, v in params.items() if v is not None and k != "few_shot_count"}
+        api_params["messages"] = build_prompt_fewshot1(dialogue)
+        
+        summary = client.chat.completions.create(**api_params)
+        return summary.choices[0].message.content
 
-# 변경된 prompt를 사용하여, train data 중 처음 3개의 대화를 요약하고, 결과를 확인합니다.
-if __name__ == "__main__":
-    test_on_train_data()
+    # Train data 테스트
+    def test_on_train_data_fewshot1(num_samples=3):
+        for idx, row in train_df[:num_samples].iterrows():
+            dialogue = row['dialogue']
+            summary = summarization_fewshot1(dialogue)
+            log.info(f"Dialogue:\n{dialogue}\n")
+            log.info(f"Pred Summary: {summary}\n")
+            log.info(f"Gold Summary: {row['summary']}\n")
+            log.info("=="*50)
 
-# 변경된 prompt를 사용하여, validation data의 대화를 요약하고, 점수를 측정합니다.
-if __name__ == "__main__":
-    validate(100)
+    test_on_train_data_fewshot1()
 
-log.info("""### (선택) 변경된 Prompt로 test dataset에 대한 요약을 진행합니다.
+    # Validation 테스트
+    def validate_fewshot1(num_samples=-1):
+        val_samples = val_df[:num_samples] if num_samples > 0 else val_df
+
+        scores = []
+        all_predictions = []
+        all_labels = []
+        
+        for idx, row in tqdm(val_samples.iterrows(), total=len(val_samples)):
+            dialogue = row['dialogue']
+            summary = summarization_fewshot1(dialogue)
+            results = compute_metrics(summary, row['summary'])
+            avg_score = sum(results.values()) / len(results)
+
+            scores.append(avg_score)
+            all_predictions.append(summary)
+            all_labels.append(row['summary'])
+
+        val_avg_score = sum(scores) / len(scores)
+        log.info(f"첫 번째 퓨샷 - Validation Average Score (개별 평균): {val_avg_score}")
+        
+        log.info("="*50)
+        log.info("첫 번째 퓨샷 - 상세한 ROUGE 메트릭 분석")
+        log.info("="*50)
+        
+        remove_tokens = ['<usr>', '<s>', '</s>', '<pad>']
+        replaced_predictions = all_predictions.copy()
+        replaced_labels = all_labels.copy()
+        
+        for token in remove_tokens:
+            replaced_predictions = [sentence.replace(token, " ") for sentence in replaced_predictions]
+            replaced_labels = [sentence.replace(token, " ") for sentence in replaced_labels]
+
+        log.info('-'*150)
+        for i in range(min(3, len(replaced_predictions))):
+            log.info(f"PRED {i+1}: {replaced_predictions[i]}")
+            log.info(f"GOLD {i+1}: {replaced_labels[i]}")
+            log.info('-'*150)
+
+        rouge_evaluator = Rouge()
+        results = rouge_evaluator.get_scores(replaced_predictions, replaced_labels, avg=True)
+        
+        log.info('-'*150)
+        log.info("첫 번째 퓨샷 - ROUGE Evaluation Results:")
+        for metric_name, metric_values in results.items():
+            log.info(f"{metric_name.upper()}: Precision={metric_values['p']:.4f}, Recall={metric_values['r']:.4f}, F1={metric_values['f']:.4f}")
+        
+        log.info('-'*150)
+        
+        f1_scores = [value["f"] for value in results.values()]
+        batch_avg_score = sum(f1_scores) / len(f1_scores)
+        log.info(f"첫 번째 퓨샷 - Validation Average Score (전체 배치): {batch_avg_score}")
+        
+        return val_avg_score, batch_avg_score
+
+    validate_fewshot1(100)
+    
+    # 첫 번째 퓨샷 방식으로 test dataset에 대한 추론을 수행합니다.
+    def inference_fewshot1(output_filename="output_solar_fewshot1.csv"):
+        test_df = pd.read_csv(os.path.join(DATA_PATH, 'test.csv'))
+
+        summary = []
+        start_time = time.time()
+        for idx, row in tqdm(test_df.iterrows(), total=len(test_df)):
+            dialogue = row['dialogue']
+            summary.append(summarization_fewshot1(dialogue))
+
+            if (idx + 1) % 100 == 0:
+                end_time = time.time()
+                elapsed_time = end_time - start_time
+
+                if elapsed_time < 60:
+                    wait_time = 60 - elapsed_time + 5
+                    log.info(f"Elapsed time: {elapsed_time:.2f} sec")
+                    log.info(f"Waiting for {wait_time} sec")
+                    time.sleep(wait_time)
+
+                start_time = time.time()
+
+        output = pd.DataFrame(
+            {
+                "fname": test_df['fname'],
+                "summary" : summary,
+            }
+        )
+
+        if not os.path.exists(RESULT_PATH):
+            os.makedirs(RESULT_PATH)
+        output.to_csv(os.path.join(RESULT_PATH, output_filename), index=False)
+
+        return output
+
+    output = inference_fewshot1("output_solar_fewshot1.csv")
+    log.info(output)
+
+def run_second_fewshot_method():
+    """두 번째 퓨샷 방식 - assistant-user 대화 형태"""
+    log.info("""## 4. 다른 방식으로 Few-shot sample을 제공하여 Prompt를 구성 (두 번째 퓨샷)""")
+
+    # Few-shot prompt를 생성하기 위해, train data의 일부를 사용합니다.
+    few_shot_samples = train_df.sample(params["few_shot_count"])
+
+    # 퓨샷 샘플들을 리스트로 저장
+    few_shot_dialogues = []
+    few_shot_summaries = []
+
+    for i in range(len(few_shot_samples)):
+        dialogue = few_shot_samples.iloc[i]['dialogue']
+        summary = few_shot_samples.iloc[i]['summary']
+        few_shot_dialogues.append(dialogue)
+        few_shot_summaries.append(summary)
+
+    # 두 번째 퓨샷 방식용 build_prompt 함수
+    def build_prompt_fewshot2(dialogue):
+        system_prompt = "You are a expert in the field of dialogue summarization, summarize the given dialogue in a concise manner. Follow the user's instruction carefully and provide a summary that is relevant to the dialogue."
+
+        # 메시지 리스트 시작
+        messages = [{"role": "system", "content": system_prompt}]
+        
+        # 여러 퓨샷 예제들을 assistant-user 대화 형태로 추가
+        for i in range(len(few_shot_dialogues)):
+            if i == 0:
+                # 첫 번째 예제는 instruction 포함
+                few_shot_user_prompt = (
+                    "Following the instructions below, summarize the given document.\n"
+                    "Instructions:\n"
+                    "1. Read the provided sample dialogue and corresponding summary.\n"
+                    "2. Read the dialogue carefully.\n"
+                    "3. Following the sample's style of summary, provide a concise summary of the given dialogue. Be sure that the summary is simple but captures the essence of the dialogue.\n\n"
+                    "Dialogue:\n"
+                    f"{few_shot_dialogues[i]}\n\n"
+                    "Summary:\n"
+                )
+            else:
+                # 이후 예제들은 dialogue만
+                few_shot_user_prompt = (
+                    "Dialogue:\n"
+                    f"{few_shot_dialogues[i]}\n\n"
+                    "Summary:\n"
+                )
+            
+            messages.append({"role": "user", "content": few_shot_user_prompt})
+            messages.append({"role": "assistant", "content": few_shot_summaries[i]})
+
+        # 실제 질문 추가
+        user_prompt = (
+            "Dialogue:\n"
+            f"{dialogue}\n\n"
+            "Summary:\n"
+        )
+        messages.append({"role": "user", "content": user_prompt})
+
+        return messages
+
+    # 두 번째 퓨샷 방식용 summarization 함수
+    def summarization_fewshot2(dialogue):
+        api_params = {k: v for k, v in params.items() if v is not None and k != "few_shot_count"}
+        api_params["messages"] = build_prompt_fewshot2(dialogue)
+        
+        summary = client.chat.completions.create(**api_params)
+        return summary.choices[0].message.content
+
+    # Train data 테스트
+    def test_on_train_data_fewshot2(num_samples=3):
+        for idx, row in train_df[:num_samples].iterrows():
+            dialogue = row['dialogue']
+            summary = summarization_fewshot2(dialogue)
+            log.info(f"Dialogue:\n{dialogue}\n")
+            log.info(f"Pred Summary: {summary}\n")
+            log.info(f"Gold Summary: {row['summary']}\n")
+            log.info("=="*50)
+
+    test_on_train_data_fewshot2()
+
+    # Validation 테스트
+    def validate_fewshot2(num_samples=-1):
+        val_samples = val_df[:num_samples] if num_samples > 0 else val_df
+
+        scores = []
+        all_predictions = []
+        all_labels = []
+        
+        for idx, row in tqdm(val_samples.iterrows(), total=len(val_samples)):
+            dialogue = row['dialogue']
+            summary = summarization_fewshot2(dialogue)
+            results = compute_metrics(summary, row['summary'])
+            avg_score = sum(results.values()) / len(results)
+
+            scores.append(avg_score)
+            all_predictions.append(summary)
+            all_labels.append(row['summary'])
+
+        val_avg_score = sum(scores) / len(scores)
+        log.info(f"두 번째 퓨샷 - Validation Average Score (개별 평균): {val_avg_score}")
+        
+        log.info("="*50)
+        log.info("두 번째 퓨샷 - 상세한 ROUGE 메트릭 분석")
+        log.info("="*50)
+        
+        remove_tokens = ['<usr>', '<s>', '</s>', '<pad>']
+        replaced_predictions = all_predictions.copy()
+        replaced_labels = all_labels.copy()
+        
+        for token in remove_tokens:
+            replaced_predictions = [sentence.replace(token, " ") for sentence in replaced_predictions]
+            replaced_labels = [sentence.replace(token, " ") for sentence in replaced_labels]
+
+        log.info('-'*150)
+        for i in range(min(3, len(replaced_predictions))):
+            log.info(f"PRED {i+1}: {replaced_predictions[i]}")
+            log.info(f"GOLD {i+1}: {replaced_labels[i]}")
+            log.info('-'*150)
+
+        rouge_evaluator = Rouge()
+        results = rouge_evaluator.get_scores(replaced_predictions, replaced_labels, avg=True)
+        
+        log.info('-'*150)
+        log.info("두 번째 퓨샷 - ROUGE Evaluation Results:")
+        for metric_name, metric_values in results.items():
+            log.info(f"{metric_name.upper()}: Precision={metric_values['p']:.4f}, Recall={metric_values['r']:.4f}, F1={metric_values['f']:.4f}")
+        
+        log.info('-'*150)
+        
+        f1_scores = [value["f"] for value in results.values()]
+        batch_avg_score = sum(f1_scores) / len(f1_scores)
+        log.info(f"두 번째 퓨샷 - Validation Average Score (전체 배치): {batch_avg_score}")
+        
+        return val_avg_score, batch_avg_score
+
+    validate_fewshot2(100)
+
+    log.info("""### (선택) 변경된 Prompt로 test dataset에 대한 요약을 진행합니다.
 - 변경된 prompt를 통해 점수가 개선되었다면, test dataset에 대한 요약을 진행하고 제출합니다.
 """)
 
-# 변경된 prompt를 사용하여, test data의 대화를 요약하고, 결과를 확인합니다.
-if __name__ == "__main__":
-    output = inference("output_solar_fewshot2.csv")
+    # 두 번째 퓨샷 방식으로 test dataset에 대한 추론을 수행합니다.
+    def inference_fewshot2(output_filename="output_solar_fewshot2.csv"):
+        test_df = pd.read_csv(os.path.join(DATA_PATH, 'test.csv'))
 
-log.info(output)
+        summary = []
+        start_time = time.time()
+        for idx, row in tqdm(test_df.iterrows(), total=len(test_df)):
+            dialogue = row['dialogue']
+            summary.append(summarization_fewshot2(dialogue))
+
+            if (idx + 1) % 100 == 0:
+                end_time = time.time()
+                elapsed_time = end_time - start_time
+
+                if elapsed_time < 60:
+                    wait_time = 60 - elapsed_time + 5
+                    log.info(f"Elapsed time: {elapsed_time:.2f} sec")
+                    log.info(f"Waiting for {wait_time} sec")
+                    time.sleep(wait_time)
+
+                start_time = time.time()
+
+        output = pd.DataFrame(
+            {
+                "fname": test_df['fname'],
+                "summary" : summary,
+            }
+        )
+
+        if not os.path.exists(RESULT_PATH):
+            os.makedirs(RESULT_PATH)
+        output.to_csv(os.path.join(RESULT_PATH, output_filename), index=False)
+
+        return output
+
+    output = inference_fewshot2("output_solar_fewshot2.csv")
+    log.info(output)
+
+def main():
+    """메인 함수 - 모든 방식 순차 실행"""
+    log.info("="*60)
+    log.info("Solar API 대화 요약 시스템 시작")
+    log.info("="*60)
+    
+    # API 연결 테스트
+    # test_api_connection()
+    
+    # 기본 방식 실행
+    # run_basic_method()
+    
+    # 첫 번째 퓨샷 방식 실행
+    # run_first_fewshot_method()
+    
+    # 두 번째 퓨샷 방식 실행
+    run_second_fewshot_method()
+    
+    log.info("="*60)
+    log.info("모든 방식 실행 완료")
+    log.info("="*60)
+
+if __name__ == "__main__":
+    main()
