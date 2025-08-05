@@ -31,9 +31,9 @@ model_baseline_20250804_131245.zip
 
 ## 3단계: 앙상블 추론 실행
 
-### 방법 1: ensemble_inference.py 직접 수정
-1. `ensemble_inference.py` 파일을 열기
-2. `main()` 함수의 `model_paths` 리스트를 실제 저장된 모델 경로로 수정:
+### 모델 경로 설정
+1. `ensemble_inference.py` 파일을 열기  
+2. `run_single_method()` 함수와 `main()` 함수의 `model_paths` 리스트를 실제 저장된 모델 경로로 수정:
 
 ```python
 model_paths = [
@@ -44,13 +44,34 @@ model_paths = [
 ]
 ```
 
-3. 실행:
+### 실행 방법
+
+#### 1. 모든 앙상블 방식 비교 (추천)
 ```bash
 python ensemble_inference.py
+# 또는
+python ensemble_inference.py --mode=all
 ```
 
-### 방법 2: 모든 저장된 모델 자동 사용 (향후 개선 가능)
-현재는 수동으로 경로를 지정해야 하지만, 필요시 `models/` 폴더의 모든 ZIP 파일을 자동으로 로드하도록 수정 가능합니다.
+#### 2. 개별 앙상블 방식 실행
+```bash
+# 하드 보팅만 실행
+python ensemble_inference.py --mode=hard_voting
+
+# 소프트 보팅만 실행  
+python ensemble_inference.py --mode=soft_voting
+
+# 길이 기반만 실행
+python ensemble_inference.py --mode=length_based
+
+# 실시간 토큰 앙상블만 실행
+python ensemble_inference.py --mode=realtime_token
+```
+
+#### 3. 도움말 확인
+```bash
+python ensemble_inference.py --help
+```
 
 ## 4단계: 결과 확인
 
@@ -86,9 +107,26 @@ model_baseline_20250804_123456.zip
 
 ## 앙상블 전략
 
-- **하드 보팅**: 각 모델이 독립적으로 완전한 텍스트 생성 후 토큰 단위 다수결
+### 1. 하드 보팅 (Hard Voting)
+- 각 모델이 독립적으로 완전한 텍스트 생성 후 토큰 단위 다수결
+- 토큰별로 가장 많이 선택된 토큰을 최종 결과로 사용
+
+### 2. 소프트 보팅 (Soft Voting) 
+- 각 모델의 확률 분포를 평균하여 최적 후보 선택
+- Beam search로 여러 후보 생성 후 평균 점수가 가장 높은 것 선택
+
+### 3. 길이 기반 (Length-based)
+- 각 모델의 생성 결과 중 가장 긴 텍스트를 선택
+- 더 자세한 요약을 선호하는 방식
+
+### 4. 실시간 토큰 앙상블 (Realtime Token Ensemble)
+- 매 토큰 생성마다 모든 모델의 확률 분포를 평균
+- 실시간으로 앙상블하여 가장 정교한 결과 생성
+
+### 특징
 - **동일 가중치**: 모든 모델이 동등하게 처리됨 (성능 기반 가중치 없음)
 - **다양성 활용**: 서로 다른 하이퍼파라미터 조합의 장점을 모두 활용
+- **성능 비교**: `--mode=all`로 모든 방식의 성능을 자동 비교 가능
 
 ## 문제 해결
 
