@@ -165,7 +165,12 @@ log.info("""Validation Dataset을 이용하여 요약을 진행하고, 성능을
 def validate(num_samples=-1):
     val_samples = val_df[:num_samples] if num_samples > 0 else val_df
 
+    # 기존 개별 점수 계산 방식 유지
     scores = []
+    # 전체 배치 계산을 위한 리스트
+    all_predictions = []
+    all_labels = []
+    
     for idx, row in tqdm(val_samples.iterrows(), total=len(val_samples)):
         dialogue = row['dialogue']
         summary = summarization(dialogue)
@@ -173,10 +178,53 @@ def validate(num_samples=-1):
         avg_score = sum(results.values()) / len(results)
 
         scores.append(avg_score)
+        all_predictions.append(summary)
+        all_labels.append(row['summary'])
 
+    # 기존 평균 점수 방식
     val_avg_score = sum(scores) / len(scores)
+    log.info(f"Validation Average Score (개별 평균): {val_avg_score}")
+    
+    # baseline.py와 같은 방식의 상세한 ROUGE 분석
+    log.info("="*50)
+    log.info("상세한 ROUGE 메트릭 분석 (baseline.py 방식)")
+    log.info("="*50)
+    
+    # 정확한 평가를 위해 미리 정의된 불필요한 생성토큰들을 제거합니다.
+    # baseline.py의 remove_tokens와 동일하게 설정
+    remove_tokens = ['<usr>', '<s>', '</s>', '<pad>']
+    replaced_predictions = all_predictions.copy()
+    replaced_labels = all_labels.copy()
+    
+    for token in remove_tokens:
+        replaced_predictions = [sentence.replace(token, " ") for sentence in replaced_predictions]
+        replaced_labels = [sentence.replace(token, " ") for sentence in replaced_labels]
 
-    log.info(f"Validation Average Score: {val_avg_score}")
+    # 예측 결과와 정답 샘플 출력 (처음 3개)
+    log.info('-'*150)
+    for i in range(min(3, len(replaced_predictions))):
+        log.info(f"PRED {i+1}: {replaced_predictions[i]}")
+        log.info(f"GOLD {i+1}: {replaced_labels[i]}")
+        log.info('-'*150)
+
+    # 최종적인 ROUGE 점수를 계산합니다.
+    rouge_evaluator = Rouge()
+    results = rouge_evaluator.get_scores(replaced_predictions, replaced_labels, avg=True)
+    
+    # ROUGE 점수 결과를 로그에 출력
+    log.info('-'*150)
+    log.info("ROUGE Evaluation Results:")
+    for metric_name, metric_values in results.items():
+        log.info(f"{metric_name.upper()}: Precision={metric_values['p']:.4f}, Recall={metric_values['r']:.4f}, F1={metric_values['f']:.4f}")
+    
+    log.info('-'*150)
+    
+    # F1 점수들의 평균 계산
+    f1_scores = [value["f"] for value in results.values()]
+    batch_avg_score = sum(f1_scores) / len(f1_scores)
+    log.info(f"Validation Average Score (전체 배치): {batch_avg_score}")
+    
+    return val_avg_score, batch_avg_score
 
 if __name__ == "__main__":
     validate(100) # 100개의 validation sample에 대한 요약을 수행합니다.
@@ -278,6 +326,10 @@ if __name__ == "__main__":
 # 변경된 prompt를 사용하여, validation data의 대화를 요약하고, 점수를 측정합니다.
 if __name__ == "__main__":
     validate(100)
+    
+# 첫 번째 퓨샷 방식으로 test dataset에 대한 추론을 수행합니다.
+if __name__ == "__main__":
+    output = inference("output_solar_fewshot1.csv")
 
 log.info("""다른 방식으로 Few-shot sample을 제공하여 Prompt를 구성해 봅니다.""")
 
@@ -324,6 +376,6 @@ log.info("""### (선택) 변경된 Prompt로 test dataset에 대한 요약을 �
 
 # 변경된 prompt를 사용하여, test data의 대화를 요약하고, 결과를 확인합니다.
 if __name__ == "__main__":
-    output = inference("output_solar_fewshot.csv")
+    output = inference("output_solar_fewshot2.csv")
 
 log.info(output)
