@@ -41,11 +41,10 @@ load_dotenv()
 
 # API 파라미터 글로벌 설정
 params = {
-    "model": "solar-1-mini-chat",
+    "model": "9",  # 사용 가능한 모델 후보 : solar-pro2, solar-pro, solar-mini, solar-pro-nightly, solar-mini-nightly, solar-1-mini-chat
     "temperature": 0.2,
     "top_p": 0.3,
-    "stream": False,
-    "max_tokens": None  # 필요시 설정
+    "few_shot_count": 1  # 퓨샷 예제 개수
 }
 
 log.info("""### 2) Solar Chat API Client 생성하기
@@ -294,28 +293,37 @@ log.info("""## 3. Prompt Engineering
 """)
 
 # Few-shot prompt를 생성하기 위해, train data의 일부를 사용합니다.
-few_shot_samples = train_df.sample(1)
+few_shot_samples = train_df.sample(params["few_shot_count"])
 
-sample_dialogue1 = few_shot_samples.iloc[0]['dialogue']
-sample_summary1 = few_shot_samples.iloc[0]['summary']
+# 퓨샷 샘플들을 리스트로 저장
+few_shot_dialogues = []
+few_shot_summaries = []
 
-log.info(f"Sample Dialogue1:\n{sample_dialogue1}\n")
-log.info(f"Sample Summary1: {sample_summary1}\n")
+for i in range(len(few_shot_samples)):
+    dialogue = few_shot_samples.iloc[i]['dialogue']
+    summary = few_shot_samples.iloc[i]['summary']
+    few_shot_dialogues.append(dialogue)
+    few_shot_summaries.append(summary)
+    log.info(f"Sample Dialogue{i+1}:\n{dialogue}\n")
+    log.info(f"Sample Summary{i+1}: {summary}\n")
 
-# Prompt를 생성하는 함수를 수정합니다.
+# Prompt를 생성하는 함수를 수정합니다. (첫 번째 퓨샷 방식)
 def build_prompt(dialogue):
     system_prompt = "You are a expert in the field of dialogue summarization, summarize the given dialogue in a concise manner. Follow the user's instruction carefully and provide a summary that is relevant to the dialogue."
 
+    # 여러 퓨샷 예제들을 하나의 user 메시지에 포함
+    examples_text = ""
+    for i in range(len(few_shot_dialogues)):
+        examples_text += f"Sample Dialogue {i+1}:\n{few_shot_dialogues[i]}\n\n"
+        examples_text += f"Sample Summary {i+1}:\n{few_shot_summaries[i]}\n\n"
+    
     user_prompt = (
         "Following the instructions below, summarize the given document.\n"
         "Instructions:\n"
-        "1. Read the provided sample dialogue and corresponding summary.\n"
+        f"1. Read the provided {len(few_shot_dialogues)} sample dialogue(s) and corresponding summary(ies).\n"
         "2. Read the dialogue carefully.\n"
         "3. Following the sample's style of summary, provide a concise summary of the given dialogue.\n\n"
-        "Sample Dialogue:\n"
-        f"{sample_dialogue1}\n\n"
-        "Sample Summary:\n"
-        f"{sample_summary1}\n\n"
+        f"{examples_text}"
         "Dialogue:\n"
         f"{dialogue}\n\n"
         "Summary:\n"
@@ -346,34 +354,47 @@ if __name__ == "__main__":
 
 log.info("""다른 방식으로 Few-shot sample을 제공하여 Prompt를 구성해 봅니다.""")
 
-# Few-shot sample을 다른 방식으로 사용하여 prompt를 생성합니다.
+# Few-shot sample을 다른 방식으로 사용하여 prompt를 생성합니다. (두 번째 퓨샷 방식)
 def build_prompt(dialogue):
     system_prompt = "You are a expert in the field of dialogue summarization, summarize the given dialogue in a concise manner. Follow the user's instruction carefully and provide a summary that is relevant to the dialogue."
 
-    few_shot_user_prompt_1 = (
-        "Following the instructions below, summarize the given document.\n"
-        "Instructions:\n"
-        "1. Read the provided sample dialogue and corresponding summary.\n"
-        "2. Read the dialogue carefully.\n"
-        "3. Following the sample's style of summary, provide a concise summary of the given dialogue. Be sure that the summary is simple but captures the essence of the dialogue.\n\n"
-        "Dialogue:\n"
-        f"{sample_dialogue1}\n\n"
-        "Summary:\n"
-    )
-    few_shot_assistant_prompt_1 = sample_summary1
+    # 메시지 리스트 시작
+    messages = [{"role": "system", "content": system_prompt}]
+    
+    # 여러 퓨샷 예제들을 assistant-user 대화 형태로 추가
+    for i in range(len(few_shot_dialogues)):
+        if i == 0:
+            # 첫 번째 예제는 instruction 포함
+            few_shot_user_prompt = (
+                "Following the instructions below, summarize the given document.\n"
+                "Instructions:\n"
+                "1. Read the provided sample dialogue and corresponding summary.\n"
+                "2. Read the dialogue carefully.\n"
+                "3. Following the sample's style of summary, provide a concise summary of the given dialogue. Be sure that the summary is simple but captures the essence of the dialogue.\n\n"
+                "Dialogue:\n"
+                f"{few_shot_dialogues[i]}\n\n"
+                "Summary:\n"
+            )
+        else:
+            # 이후 예제들은 dialogue만
+            few_shot_user_prompt = (
+                "Dialogue:\n"
+                f"{few_shot_dialogues[i]}\n\n"
+                "Summary:\n"
+            )
+        
+        messages.append({"role": "user", "content": few_shot_user_prompt})
+        messages.append({"role": "assistant", "content": few_shot_summaries[i]})
 
+    # 실제 질문 추가
     user_prompt = (
         "Dialogue:\n"
         f"{dialogue}\n\n"
         "Summary:\n"
     )
+    messages.append({"role": "user", "content": user_prompt})
 
-    return [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": few_shot_user_prompt_1},
-        {"role": "assistant", "content": few_shot_assistant_prompt_1},
-        {"role": "user", "content": user_prompt},
-    ]
+    return messages
 
 # 변경된 prompt를 사용하여, train data 중 처음 3개의 대화를 요약하고, 결과를 확인합니다.
 if __name__ == "__main__":
