@@ -288,24 +288,27 @@ def solar_api_sweep_train():
         
         print(f"Validation 완료. ROUGE Average: {rouge_avg:.6f}")
         
-        # 추론 실행
-        print("Test inference 시작...")
-        csv_path, output_df = inference_solar_api(
-            client, test_df, train_df,
-            config["model"], config["temperature"], config["top_p"], config["few_shot_count"]
-        )
-        
-        # WandB 아티팩트로 CSV 등록
-        artifact = wandb.Artifact(
-            name=f"solar_api_predictions_{wandb.run.id}",
-            type="predictions",
-            description=f"Solar API predictions with model={config['model']}, temp={config['temperature']}, few_shot={config['few_shot_count']}"
-        )
-        artifact.add_file(csv_path)
-        wandb.log_artifact(artifact)
-        
-        print(f"추론 완료. CSV 저장: {csv_path}")
-        print(f"WandB 아티팩트 등록 완료")
+        # ROUGE_avg 0.27 이상일 때만 테스트 추론 실행
+        if rouge_avg >= 0.27:
+            print(f"ROUGE Average {rouge_avg:.6f} >= 0.27 조건 만족. Test inference 시작...")
+            csv_path, output_df = inference_solar_api(
+                client, test_df, train_df,
+                config["model"], config["temperature"], config["top_p"], config["few_shot_count"]
+            )
+            
+            # WandB 아티팩트로 CSV 등록
+            artifact = wandb.Artifact(
+                name=f"solar_api_predictions_{wandb.run.id}",
+                type="predictions",
+                description=f"Solar API predictions with model={config['model']}, temp={config['temperature']}, few_shot={config['few_shot_count']}"
+            )
+            artifact.add_file(csv_path)
+            wandb.log_artifact(artifact)
+            
+            print(f"추론 완료. CSV 저장: {csv_path}")
+            print(f"WandB 아티팩트 등록 완료")
+        else:
+            print(f"ROUGE Average {rouge_avg:.6f} < 0.27 조건 미달. Test inference 건너뜀.")
         
     except Exception as e:
         print(f"Training failed with error: {e}")
@@ -314,6 +317,18 @@ def solar_api_sweep_train():
     
     # 정상 종료
     wandb.finish()
+    
+    # 다음 실험을 위한 10분 대기 (API rate limit 방지)
+    print("실험 완료. 다음 실험을 위해 10분 대기 중...")
+    wait_time = 600*3  # 10분 = 600초
+    
+    for i in range(wait_time, 0, -30):  # 30초마다 진행 상황 출력
+        minutes = i // 60
+        seconds = i % 60
+        print(f"남은 대기 시간: {minutes}분 {seconds}초")
+        time.sleep(30)
+    
+    print("대기 완료. 다음 실험 시작 가능.")
 
 def create_sweep_from_yaml(yaml_path="config_sweep_solar.yaml", project_name="solar-api-sweep"):
     """YAML 파일에서 sweep 설정을 읽어와 sweep 생성"""
