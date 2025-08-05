@@ -39,9 +39,23 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 # .env 파일에서 환경 변수 로드
 load_dotenv()
 
+# API 파라미터 글로벌 설정
+params = {
+    "model": "solar-1-mini-chat",
+    "temperature": 0.2,
+    "top_p": 0.3,
+    "stream": False,
+    "max_tokens": None  # 필요시 설정
+}
+
 log.info("""### 2) Solar Chat API Client 생성하기
 - 앞으로 Solar Chat API를 사용하기 위해 Client를 생성합니다.
 """)
+
+# API 파라미터 로그 출력
+log.info("API 파라미터 설정:")
+for key, value in params.items():
+    log.info(f"  {key}: {value}")
 
 UPSTAGE_API_KEY = os.getenv("UPSTAGE_API_KEY") # .env 파일에서 API KEY를 읽어옵니다.
 
@@ -55,7 +69,7 @@ log.info("""### 3) Solar Chat API 사용해보기 (선택)
 """)
 
 stream = client.chat.completions.create(
-    model="solar-1-mini-chat",
+    model=params["model"],
     messages=[
       {
         "role": "system",
@@ -123,7 +137,7 @@ def build_prompt(dialogue):
 # Solar Chat API를 활용해 Summarization을 수행하는 함수를 정의합니다.
 def summarization(dialogue):
     summary = client.chat.completions.create(
-        model="solar-1-mini-chat",
+        model=params["model"],
         messages=build_prompt(dialogue),
     )
 
@@ -135,12 +149,11 @@ log.info("""### (선택) parameter 변경하기
 """)
 
 def summarization(dialogue):
-    summary = client.chat.completions.create(
-        model="solar-1-mini-chat",
-        messages=build_prompt(dialogue),
-        temperature=0.2,
-        top_p=0.3,
-    )
+    # params에서 None이 아닌 값들만 사용
+    api_params = {k: v for k, v in params.items() if v is not None}
+    api_params["messages"] = build_prompt(dialogue)
+    
+    summary = client.chat.completions.create(**api_params)
 
     return summary.choices[0].message.content
 
