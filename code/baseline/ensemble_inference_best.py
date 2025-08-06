@@ -58,6 +58,15 @@ def get_model_paths():
         "./models/model_baseline_20250805_070447.zip",  
         "./models/model_baseline_20250805_060913.zip",
         "./models/model_baseline_20250805_094805.zip",
+        # 추가
+        "./models/model_baseline_20250805_234915.zip",
+        "./models/model_baseline_20250806_033243.zip",
+        "./models/model_baseline_20250805_191209.zip",
+        "./models/model_baseline_20250805_173237.zip",
+        "./models/model_baseline_20250805_183711.zip",
+        # AEDA
+        "./models/model_baseline_20250806_083123.zip",
+        "./models/model_baseline_20250806_084905.zip",
     ]
     
     # 존재하는 모델 파일만 필터링
@@ -2018,24 +2027,23 @@ class PostProcessingEnsemble:
         log.info("검증 데이터 평가 완료 (baseline.py 방식 사용)")
         return evaluation_results
     
-    def run_ensemble(self, test_data_path):
+    def run_ensemble(self, test_data_path, method_name=None):
         """
-        하드 보팅 앙상블 실행
+        앙상블 실행
         
         Args:
             test_data_path: 테스트 데이터 경로
+            method_name: 실행할 특정 방식 ('hard_voting', 'soft_voting', 'length_based', 'logit_level' 또는 None - 모든 방식)
             
         Returns:
             tuple: (ensemble_result_df, individual_results_list)
         """
         log.info(f"앙상블 추론 시작: {test_data_path}")
         
-        # 테스트 데이터 로드 (빠른 테스트를 위해 일부만 사용)
+        # 테스트 데이터 로드
         test_df = pd.read_csv(test_data_path)
-        # 빠른 테스트를 위해 처음 20개만 사용
-        test_df = test_df.head(20)
         input_texts = test_df['dialogue'].tolist()
-        log.info(f"테스트 데이터 로드 완룼: {len(input_texts)}개 샘플 (빠른 테스트용)")
+        log.info(f"테스트 데이터 로드 완료: {len(input_texts)}개 샘플")
         
         # 개별 모델들로 추론 수행
         all_generated_texts = []
@@ -2050,56 +2058,75 @@ class PostProcessingEnsemble:
             
             log.info(f"모델 {i+1} 추론 완료")
         
-        # 세 가지 앙상블 방식 모두 수행
-        log.info("\n=== 하드 보팅 vs 소프트 보팅 vs 길이 기반 앙상블 수행 ===")
+        # 앙상블 방식 수행
+        if method_name:
+            log.info(f"\n=== {method_name} 앙상블 수행 ===")
+        else:
+            log.info("\n=== 하드 보팅 vs 소프트 보팅 vs 길이 기반 vs Logit 레벨 앙상블 수행 ===")
+        
+        # 앙상블 결과 초기화
+        hard_voting_results = None
+        soft_voting_results = None
+        length_based_results = None
+        logit_level_results = None
         
         # 1. 하드 보팅 앙상블
-        log.info("하드 보팅 앙상블 시작...")
-        hard_voting_results = self.token_level_hard_voting(all_generated_texts, self.tokenizers[0])
+        if method_name is None or method_name == "hard_voting":
+            log.info("하드 보팅 앙상블 시작...")
+            hard_voting_results = self.token_level_hard_voting(all_generated_texts, self.tokenizers[0])
         
         # 2. 소프트 보팅 앙상블
-        log.info("소프트 보팅 앙상블 시작...")
-        soft_voting_results = self.soft_voting_ensemble(input_texts, self.configs[0])
+        if method_name is None or method_name == "soft_voting":
+            log.info("소프트 보팅 앙상블 시작...")
+            soft_voting_results = self.soft_voting_ensemble(input_texts, self.configs[0])
         
         # 3. 길이 기반 앙상블
-        log.info("길이 기반 앙상블 시작...")
-        length_based_results = self.length_based_ensemble(input_texts, self.configs[0])
+        if method_name is None or method_name == "length_based":
+            log.info("길이 기반 앙상블 시작...")
+            length_based_results = self.length_based_ensemble(input_texts, self.configs[0])
         
         # 4. Logit 레벨 앙상블
-        log.info("Logit 레벨 앙상블 시작...")
-        logit_level_results = self.logit_level_ensemble(input_texts, self.configs[0])
+        if method_name is None or method_name == "logit_level":
+            log.info("Logit 레벨 앙상블 시작...")
+            logit_level_results = self.logit_level_ensemble(input_texts, self.configs[0])
         
-        # 5. 네 방식의 결과 데이터프레임 생성
-        hard_voting_df = pd.DataFrame({
-            'fname': test_df['fname'],
-            'summary': hard_voting_results
-        })
+        # 5. 결과 데이터프레임 생성
+        ensemble_results = {}
         
-        soft_voting_df = pd.DataFrame({
-            'fname': test_df['fname'],
-            'summary': soft_voting_results
-        })
+        if hard_voting_results is not None:
+            hard_voting_df = pd.DataFrame({
+                'fname': test_df['fname'],
+                'summary': hard_voting_results
+            })
+            ensemble_results['hard_voting'] = hard_voting_df
         
-        length_based_df = pd.DataFrame({
-            'fname': test_df['fname'],
-            'summary': length_based_results
-        })
+        if soft_voting_results is not None:
+            soft_voting_df = pd.DataFrame({
+                'fname': test_df['fname'],
+                'summary': soft_voting_results
+            })
+            ensemble_results['soft_voting'] = soft_voting_df
         
-        logit_level_df = pd.DataFrame({
-            'fname': test_df['fname'],
-            'summary': logit_level_results
-        })
+        if length_based_results is not None:
+            length_based_df = pd.DataFrame({
+                'fname': test_df['fname'],
+                'summary': length_based_results
+            })
+            ensemble_results['length_based'] = length_based_df
         
-        log.info("앙상블 추론 완료 (하드 보팅 & 소프트 보팅 & 길이 기반 & Logit 레벨)")
+        if logit_level_results is not None:
+            logit_level_df = pd.DataFrame({
+                'fname': test_df['fname'],
+                'summary': logit_level_results
+            })
+            ensemble_results['logit_level'] = logit_level_df
         
-        # 네 방식의 결과를 모두 반환
-        ensemble_results = {
-            'hard_voting': hard_voting_df,
-            'soft_voting': soft_voting_df,
-            'length_based': length_based_df,
-            'logit_level': logit_level_df,
-            'individual_results': all_generated_texts
-        }
+        ensemble_results['individual_results'] = all_generated_texts
+        
+        if method_name:
+            log.info(f"앙상블 추론 완료 ({method_name})")
+        else:
+            log.info("앙상블 추론 완료 (하드 보팅 & 소프트 보팅 & 길이 기반 & Logit 레벨)")
         
         return ensemble_results, all_generated_texts
     
@@ -2134,6 +2161,84 @@ class PostProcessingEnsemble:
         except Exception as e:
             log.error(f"개별 모델 평가 실패: {e}")
             return {'individual_model_scores': []}
+
+def run_inference_only(method_name):
+    """
+    추론 전용 함수 - 검증/평가 생략하고 테스트 데이터 추론만 수행
+    
+    Args:
+        method_name: 실행할 방식 ('hard_voting', 'soft_voting', 'length_based', 'realtime_token', 'logit_level')
+    """
+    log.info(f"🚀 추론 전용 모드: {method_name} (검증/평가 생략)")
+    
+    # 공통 함수로 모델 경로 가져오기
+    existing_model_paths = get_model_paths()
+    if not existing_model_paths:
+        return
+    
+    log.info(f"총 {len(existing_model_paths)}개 모델로 {method_name} 추론 시작")
+    
+    # 디바이스 설정
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    
+    # 테스트 데이터 경로 확인
+    test_data_path = "../../input/data/test.csv"
+    if not os.path.exists(test_data_path):
+        log.error(f"테스트 데이터 파일이 존재하지 않습니다: {test_data_path}")
+        return
+    
+    start_time = time.time()
+    
+    # 실시간 토큰 앙상블 방식
+    if method_name == "realtime_token":
+        ensemble = RealtimeTokenEnsemble(existing_model_paths, device=device)
+        ensemble.load_models()
+        
+        # 테스트 데이터 추론만 수행
+        log.info("테스트 데이터 추론 시작 (검증 생략)")
+        ensemble_df, generation_time = ensemble.run_ensemble(test_data_path)
+        
+        # 결과 저장
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        results_dir = "./ensemble_results"
+        os.makedirs(results_dir, exist_ok=True)
+        
+        result_path = os.path.join(results_dir, f"ensemble_{method_name}_inference_only_{timestamp}.csv")
+        ensemble_df.to_csv(result_path, index=False, encoding='utf-8')
+        
+        total_time = time.time() - start_time
+        log.info(f"✅ {method_name} 추론 완료!")
+        log.info(f"📁 결과 저장: {result_path}")
+        log.info(f"⏱️ 생성 시간: {generation_time:.2f}초")
+        log.info(f"⏱️ 총 소요 시간: {total_time:.2f}초")
+        
+    # 후처리 방식들 (hard_voting, soft_voting, length_based, logit_level)
+    else:
+        ensemble = PostProcessingEnsemble(existing_model_paths, device=device)
+        ensemble.load_models()
+        
+        # 테스트 데이터 추론만 수행
+        log.info("테스트 데이터 추론 시작 (검증 생략)")
+        ensemble_results, all_generated_texts = ensemble.run_ensemble(test_data_path, method_name)
+        
+        # 선택된 방식의 결과만 저장
+        if method_name in ensemble_results:
+            ensemble_df = ensemble_results[method_name]
+            
+            # 결과 저장
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            results_dir = "./ensemble_results"
+            os.makedirs(results_dir, exist_ok=True)
+            
+            result_path = os.path.join(results_dir, f"ensemble_{method_name}_inference_only_{timestamp}.csv")
+            ensemble_df.to_csv(result_path, index=False, encoding='utf-8')
+            
+            total_time = time.time() - start_time
+            log.info(f"✅ {method_name} 추론 완료!")
+            log.info(f"📁 결과 저장: {result_path}")
+            log.info(f"⏱️ 총 소요 시간: {total_time:.2f}초")
+        else:
+            log.error(f"지원하지 않는 방식입니다: {method_name}")
 
 def run_single_method(method_name):
     """
@@ -2509,6 +2614,10 @@ if __name__ == "__main__":
   python ensemble_inference.py --mode=length_based # 길이 기반만 실행
   python ensemble_inference.py --mode=realtime_token # 실시간 토큰 앙상블만 실행
   python ensemble_inference.py --mode=logit_level    # 최적화된 Logit 앙상블만 실행
+  
+  # 추론 전용 모드 (검증/평가 생략으로 70-80% 시간 단축)
+  python ensemble_inference.py --mode=logit_level --inference-only
+  python ensemble_inference.py --mode=realtime_token --inference-only
 
 앙상블 방식 설명:
   all           - 모든 방식을 비교하여 최적 방식 추천
@@ -2527,12 +2636,27 @@ if __name__ == "__main__":
         help='실행할 앙상블 방식 선택 (기본값: all - 모든 방식 비교)'
     )
     
+    parser.add_argument(
+        '--inference-only',
+        action='store_true',
+        help='검증/평가 생략하고 테스트 데이터 추론만 수행 (시간 70-80%% 단축)'
+    )
+    
     args = parser.parse_args()
     
-    # 선택된 모드 로깅
-    if args.mode == 'all':
-        log.info("🔬 모든 앙상블 방식 비교 모드 시작")
-        main("comprehensive")
+    # 추론 전용 모드 확인
+    if args.inference_only:
+        if args.mode == 'all':
+            log.error("❌ --inference-only는 개별 방식에서만 사용 가능합니다.")
+            log.error("   사용 예시: --mode=logit_level --inference-only")
+        else:
+            log.info(f"🚀 추론 전용 모드 시작: {args.mode}")
+            run_inference_only(args.mode)
     else:
-        log.info(f"🎯 개별 방식 실행 모드: {args.mode}")
-        main(args.mode)
+        # 일반 모드 (검증/평가 포함)
+        if args.mode == 'all':
+            log.info("🔬 모든 앙상블 방식 비교 모드 시작")
+            main("comprehensive")
+        else:
+            log.info(f"🎯 개별 방식 실행 모드: {args.mode}")
+            main(args.mode)
