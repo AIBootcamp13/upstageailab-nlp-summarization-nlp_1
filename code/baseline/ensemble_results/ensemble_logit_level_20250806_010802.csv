@@ -1,0 +1,500 @@
+fname,summary
+test_0,"#Person1# 은 Ms. Dawson에게 사내 메모를 작성해 달라고 요청하고, Ms. Dawson은 이를 수락합니다."
+test_1,#Person2# 는 #Person1# 에게 출퇴근 시간에 교통체증이 심하다고 말합니다. #Person1# 은 #Person2# 에게 대중교통을 이용하면 환경 문제를 해결할 수 있다고 조언합니다.
+test_2,Kate는 #Person1# 에게 Masha와 Hero가 이혼했다고 말합니다. Masha는 양육권을 가지기로 했습니다.
+test_3,#Person1# 은 Brian의 생일을 축하하기 위해 파티를 즐깁니다.
+test_4,#Person1# 과 #Person2# 는 올림픽 공원의 중심인 올림픽 스타디움에 대해 이야기한다.
+test_5,#Person1# 은 #Person2# 에게 사업 계획서를 작성하고 투자자를 모아 사업을 시작할 것이라고 말합니다. #Person2# 는 #Person1# 에게 사업 아이디어를 두 페이지 이내로 요약한 부분이 포함된 사업 계획서를 작성해야 한다고 조언합니다.
+test_6,"#Person2# 는 #Person1# 에게 수두에 걸렸다고 말하고, #Person1# 은 #Person2# 에게 오트밀 목욕하자고 제안합니다."
+test_7,#Person2# 는 #Person1# 에게 세탁 서비스 요금에 대해 문의합니다. #Person1# 은 #Person2# 에게 세탁 서비스 요금에 대해 설명합니다.
+test_8,스티븐은 #Person1# 에게 비서와 바람피운 것을 알게 되어 이혼을 결심했다고 말합니다.
+test_9,"#Person2# 는 #Person1# 에게 아브라함 링컨이 자신의 인품이 뛰어나다고 생각하고, #Person1# 은 아브라함 링컨을 존경한다고 말합니다."
+test_10,#Person1# 은 #Person2# 에게 허베이 여행에 대해 묻습니다. #Person2# 는 황사가 호흡기 감염을 유발한다고 설명합니다.
+test_11,"#Person1# 은 Francis의 생일 파티에 초대했고, Francis는 #Person1# 에게 원격 조종 자동차 모델을 선물했습니다."
+test_12,"Steven은 Tony에게 부정행위로 인해 불합격되었다고 말하고, Tony는 열심히 공부하라고 조언한다."
+test_13,톰은 #Person1# 에게 9시 30분 기차를 타야 한다고 말합니다.
+test_14,#Person1# 은 #Person2# 에게 자신의 삶을 어떻게 조정할지 조언을 구합니다.
+test_15,"#Person1# 은 #Person2# 에게 Ruojia의 파티에 가자고 초대합니다. #Person2# 는 #Person1# 에게 Ruojia의 결혼 소식을 전하고, #Person1# 은 와인잔과 결혼 축하 카드를 가져갈 예정입니다."
+test_16,"#Person1# 은 #Person2# 에게 스트립을 잡아당기고, 뒷면을 떼어내라고 조언합니다."
+test_17,마이크는 여동생의 외모에 대해 설명합니다.
+test_18,#Person1# 은 머리가 아파서 #Person2# 에게 도움을 요청합니다.
+test_19,#Person2# 는 #Person1# 의 도움으로 새 휴대폰을 구매합니다.
+test_20,"주디는는 프랭크에게 새 직장에 지원하게 된 이유를 묻고, 프랭크는 그 이유를 설명한다."
+test_21,"#Person2# 는 #Person1# 에게 컴퓨터 프로그램을 작성할 수 있고, 비서 업무를 능숙하게 수행할 수 있다고 설명합니다."
+test_22,#Person1# 은 미디엄 레어로 스테이크와 미디엄 레어를 주문했으나 만족스럽지 않았습니다.
+test_23,#Person1# 은 Tom의 소설이 노벨상을 받았다는 소식을 듣고 기뻐합니다.
+test_24,#Person2# 는 #Person1# 에게 자신의 전공과 이전 직장에 대해 설명합니다.
+test_25,#Person2# 는 일주일에 두세 번 술을 마십니다. #Person1# 은 보통 맥주 두 잔만 마십니다. #Person2# 는 #Person1# 에게 램 바 & 그릴에서 피처 프로모션을 제안합니다.
+test_26,#Person1# 은 메이에게 소풍을 준비하는 것을 도와달라고 요청합니다.
+test_27,James는 Muriel Douglas에게 새 계정을 소개합니다. Muriel Douglas는 가족들과 Tahoe에 스키 타러 갔다가 날씨에 대해 이야기합니다.
+test_28,#Person1# 은 #Person2# 에게 돈을 인출해 달라고 요청합니다. #Person2# 는 #Person1# 에게 비밀번호를 입력하고 우물 정자를 눌러달라고 요청합니다.
+test_29,#Person1# 은 #Person2# 에게 사교적이고 진심을 전하는 대화의 중요성을 설명합니다.
+test_30,Mr. Polly는 Mr. Polly에게 가게에서 음료수를 사달라고 요청합니다.
+test_31,모니카는 프랜시스의 재무 보고서를 금요일 오후 1시부터 4시까지 검토할 예정입니다.
+test_32,#Person1# 은 인터뷰 준비를 위한 워크숍에 참가하여 #Person2# 에게 인터뷰 준비에 대한 조언을 구합니다.
+test_33,"Mike는 컷에게 Jason과 Laura가 상처받고 슬픈 연기를 하고 있지만, Jason과 Laura는 그의 반응 방식에 대해 이야기합니다."
+test_34,"Mrs. Todd는 Mrs. Todd에게 쇼핑을 제안하고, Mrs. Todd는 이에 동의합니다."
+test_35,빌은 이번 주에 매일 밤 열 시까지 일했기 때문에 피곤하다고 #Person1# 에게 말합니다. #Person1# 은 빌에게 형의 출장으로 인해 바쁘다고 말합니다.
+test_36,"Simon은 #Person1# 에게 내일 핵무기 확산을 막는 데 도움을 주는 시위에 가자고 제안합니다. #Person1# 은 시위가 정치인들의 생각을 바꿨다고 생각하며, Simon은 #Person1# 에게 물리 시험을 보자고 제안합니다."
+test_37,#Person1# 은 #Person2# 에게 누군가가 문을 두드리며 '전기'나 '가스'라고 하면 괜찮다고 생각한다고 말합니다.
+test_38,"#Person1# 은 Maggie에게 노트를 빌려달라고 요청합니다. Maggie는 수업에 참여하기 위해 노트를 빌리려 하지만, #Person1# 은 노트를 좋아하지 않습니다. 결국 #Person1# 은 Maggie에게 스터디를 제안합니다."
+test_39,#Person1# 은 Turner 교수님께 다음 학기에 지질학 고급 과목을 다시 등록할 수 있는지 문의합니다. Turner 교수는 미국 서부 지질학에 관심이 많고 Burman 교수님의 수업을 들었습니다.
+test_40,#Person1# 은 #Person2# 에게 펜던트를 새 것으로 교환해 달라고 요청합니다.
+test_41,#Person1# 은 #Person2# 에게 이모가 준 스웨터에 대해 이야기합니다. #Person2# 는 오늘 오후에 박싱 데이 세일에 갈 예정입니다.
+test_42,"#Person1# 은 #Person2# 에게 미디어 업계에서 일하는 것이 재미있을 것 같다고 말하고, #Person2# 는 TV 뉴스 디렉터가 되고 싶어합니다."
+test_43,"#Person1# 과 #Person2# 는 지루한 연설을 하고 있습니다. #Person1# 은 #Person2# 에게 지루한 연설이 지루하다고 말하고, #Person2# 는 #Person1# 에게 아이팟과 헤드폰을 챙기라고 조언합니다."
+test_44,사라는 #Person1# 에게 회사 근처의 저렴한 집을 사는 것이 비용 절감에 도움이 될 수 있다고 설명합니다.
+test_45,Mark Leach는 #Person1# 에게 런던 관광청의 관광 사무소에서 정보 담당관으로 일하고 있다고 말합니다. Mark Leach는 #Person1# 에게 자신의 업무에 대해 설명합니다.
+test_46,"Lucy와 Lucy는 다음 수업에 대해 이야기한다. Lin Fang은 영어를 좋아하고, Nancy는 수학을 좋아한다."
+test_47,James는 Mrs. Thomas에게 자신의 집 개 Oscar를 산책시켜 달라고 요청합니다. Mrs. Thomas는 주말에 #Person1# 의 여동생을 방문할 예정입니다.
+test_48,#Person1# 과 #Person2# 는 아파트의 추운 날씨에 대해 이야기합니다.
+test_49,Mike는 #Person1# 에게 Jason과 Laura의 연기가 상처받고 슬퍼 보인다고 말합니다. #Person1# 은 Jason과 Laura의 반응에 대해 묻습니다.
+test_50,#Person1# 은 #Person2# 에게 프렌드쉽 호텔로 가는 택시를 요청합니다.
+test_51,#Person1# 은 배고파서 다른 버스를 타야 합니다. #Person2# 는 #Person1# 에게 환승권을 요청합니다.
+test_52,#Person2# 는 #Person1# 에게 #Person2# 의 동네에 있는 유명한 기업들이 있다고 설명합니다.
+test_53,#Person1# 은 #Person2# 에게 Lulu가 Vic과 헤어져 전근 신청했다고 말합니다.
+test_54,데이브 톰슨은 샐리에게 짐이 아직 돌아오지 않았다고 알립니다. 샐리는 샐리에게 페인트 사러 가자고 제안합니다.
+test_55,#Person2# 는 #Person1# 에게 시청으로 가는 길을 안내합니다.
+test_56,#Person2# 는 여권을 잃어버려 #Person1# 에게 도움을 요청합니다. #Person1# 은 #Person2# 에게 분실물 보고서를 작성해 달라고 요청합니다.
+test_57,Nathaniel은 국제 학생 사무실의 Leah에게 전화를 걸어 Ms. Collins가 다음 주까지 전화를 받지 못한다고 알립니다. Nathaniel은 Ms. Collins에게 다른 사람과 약속을 잡으라고 요청합니다.
+test_58,#Person1# 은 #Person2# 에게 Dick 외에는 결혼하지 않겠다고 말했을 때 놀랐다고 이야기합니다.
+test_59,#Person1# 과 #Person2# 는 파티에서 만난 매력적인 여자와 사랑에 빠졌습니다. #Person1# 은 #Person2# 에게 금발 여자에게 말을 걸어보라고 제안합니다.
+test_60,"Jack은 정치학 수업을 좋아하며, #Person1# 은 비즈니스 커뮤니케이션 수업을 추천합니다."
+test_61,#Person1# 은 #Person2# 에게 어젯밤 비가 왔다고 말합니다. #Person2# 는 #Person1# 에게 베이징의 가을은 아름답지만 여름은 너무 춥다고 말합니다.
+test_62,"#Person1# 은 #Person2# 에게 오늘 밤 공포 영화를 보자고 제안하지만, #Person2# 는 코미디 영화를 선호합니다."
+test_63,"Adam은 #Person1# 에게 학교와 도서관, 수영장을 안내합니다."
+test_64,#Person1# 은 #Person2# 에게 임신 소식을 전합니다.
+test_65,#Person1# 은 #Person2# 에게 John이 일주일에 일곱 번 그녀와 데이트를 한다고 말합니다.
+test_66,#Person2# 는 #Person1# 에게 소프트웨어에 그림 그리기 프로그램을 추가하고 하드웨어를 업그레이드할 것을 제안합니다.
+test_67,#Person2# 는 #Person1# 에게 자신이 중국 출신이며 멕시코 출신이라고 말합니다. #Person1# 은 #Person2# 에게 자신의 나이를 묻습니다.
+test_68,"#Person1# 은 #Person2# 에게 다이어트를 권하지만, #Person2# 는 운동을 권장합니다."
+test_69,James는 식당 홀의 창가 자리를 예약했습니다.
+test_70,#Person2# 는 #Person1# 에게 공장의 규모와 직원 수에 대해 설명합니다.
+test_71,"Rebecca는 York에 있는 York Herald라는 지역 신문에서 인턴으로 시작했으며, 주니어 로컬 뉴스 리포터로 일하게 되었다고 #Person1# 에게 말합니다."
+test_72,#Person1# 은 #Person2# 에게 조별 발표를 위해 문구점에 가자고 제안합니다. #Person2# 는 #Person1# 에게 쇼핑 리스트 작성을 먼저 작성하라고 조언합니다.
+test_73,Mary는 #Person1# 에게 인터넷으로 취직 지원 방법을 설명합니다. #Person1# 은 온라인으로 구직하는 것이 안전할 것이라고 조언합니다.
+test_74,"#Person2# 는 #Person1# 에게 쇼핑 예산을 짜고 있으며, 한 달에 300달러만 사용할 수 있다고 설명합니다."
+test_75,Henry는 Jane에게 병원에 가기 위해 7번 버스를 타야 한다고 말합니다.
+test_76,#Person1# 은 수요일 오전에 #Person2# 에게 전화를 걸어 내년 판매 예측에 대해 논의합니다.
+test_77,#Person2# 는 #Person1# 에게 '뉴욕에서의 친구'라는 관광 안내 서비스를 소개합니다.
+test_78,"Mr. Jackson은 #Person1# 에게 이 회사가 어린이 장난감을 생산하고 있으며, 현재 직장에서 월 2,000 위안을 받고 있으며, 수당과 보너스를 포함하여 한 달에 약 3,000 위안을 받고 있다고 설명합니다."
+test_79,"#Person1# 은 #Person2# 에게 계약서가 아직 준비되지 않았음을 알리고, 포장 관련 조건에 대해 설명합니다."
+test_80,#Person1# 은 #Person2# 에게 ABC 렌터카가 국경 근처에서 사고를 당했다고 말합니다.
+test_81,#Person2# 는 #Person1# 에게 학교 보건실로 가는 길을 안내합니다.
+test_82,#Person2# 는 #Person1# 에게 짐 엘리베이터 소음으로 인해 방을 바꾸고 싶다고 말합니다.
+test_83,"#Person1# 은 #Person2# 의 짐을 트렁크에 넣습니다. #Person2# 는 #Person1# 을 베이징 호텔로 데려다 주고, 저녁에 픽업하러 갈 예정입니다."
+test_84,#Person2# 는 #Person1# 에게 유이창으로 가는 길을 안내합니다.
+test_85,#Person2# 의 컴퓨터가 작동하지 않습니다. #Person1# 은 #Person2# 에게 수리공에게 연락하라고 제안합니다.
+test_86,#Person2# 는 어머니 생신 선물로 목걸이를 찾고 있습니다. #Person1# 은 #Person2# 에게 금색 시계를 추천합니다.
+test_87,"Mr. Fisher는 Ms. Ross에게 전화를 걸어 뉴질랜드에 지점을 열 계획임을 알립니다. Ms. Ross는 Mr. Fisher에게 저녁 식사를 제안하고, Mr. Fisher는 이를 수락합니다."
+test_88,#Person2# 는 #Person1# 에게 #Person2# 의 나라와 캐나다의 차이점을 설명합니다. #Person2# 는 #Person1# 에게 캐나다와 캐나다의 차이점을 설명합니다.
+test_89,"#Person1# 은 #Person2# 에게 카리브해로 여행을 가자고 제안하지만, #Person2# 는 날씨가 좋지 않습니다."
+test_90,#Person1# 은 #Person2# 에게 소풍에 가져갈 과일을 묻습니다.
+test_91,#Person1# 은 #Person2# 에게 경제형 차량 렌트 비용과 운전면허증을 요청합니다.
+test_92,#Person1# 은 #Person2# 에게 엘리베이터에서 웃으면 다른 사람들을 불편하게 만들 수 있다고 말합니다.
+test_93,#Person2# 는 #Person1# 에게 작년 판매 실적이 작년보다 120% 증가했다고 설명합니다. 이는 Wallace의 기여 덕분입니다.
+test_94,#Person1# 은 가방을 도난당했다고 #Person2# 에게 말합니다. #Person2# 는 #Person1# 에게 돈을 빌려달라고 요청합니다.
+test_95,"Lin은 Steven에게 베이징의 훌륭한 식사를 칭찬하고, Steven은 중국에서는 팁을 받지 않는다고 설명합니다."
+test_96,빌은 룸메이트와 헤어져서 이사했다고 룸메이트 Brain Locker에게 말합니다.
+test_97,#Person1# 은 Tom Wilson의 호텔 체크인을 도와주고 있습니다.
+test_98,캐롤이 샤워 중이어서 수잔이 캐롤에게 전화를 걸었습니다. 수잔은 캐롤에게 내일 밤 8시 반에 질의 집에서 디저트를 가져오라고 요청했습니다.
+test_99,#Person1# 은 #Person2# 에게 Common Fitness Gym에서 일한 적이 있다고 말합니다. #Person2# 는 #Person1# 이 모퉁이에 있는 Whole Bean Cafe에서 일했다고 말합니다.
+test_100,#Person1# 과 #Person2# 는 #Person1# 이 대통령이 된 것에 대해 이야기하고 있습니다.
+test_101,#Person1# 은 ATM 사용 방법을 몰라 #Person2# 에게 도움을 요청합니다.
+test_102,수잔 밀러가 John에게 사무실 절차에 관한 메모를 전달하기 위해 전화를 걸었다.
+test_103,"#Person1# 이 Lily에게 소풍을 제안하고, Lily는 동의합니다."
+test_104,#Person1# 은 #Person2# 에게 젓가락을 사용하여 중국 연회에 초대된 경험을 이야기합니다. #Person2# 는 중국 식탁에서 어떻게 행동해야 할지 혼란스러워합니다.
+test_105,"Mary는 영화 보는 것을 좋아하고, Frank는 스릴러를 좋아합니다. Mary는 Frank에게 영화 대여점에 가입하라고 제안합니다."
+test_106,"#Person1# 은 #Person2# 에게 녹색당에 가입할 의향이 있는지 묻고, #Person2# 는 녹색당이 환경 문제에 관심이 많다고 답합니다."
+test_107,Wilson 씨는 상품 문제로 인해 #Person1# 에게 사과하고 사과합니다.
+test_108,#Person2# 는 #Person1# 에게 강도 사건을 목격했다고 말합니다.
+test_109,#Person1# 은 #Person2# 에게 저녁 메뉴를 물어본다. #Person2# 는 #Person1# 에게 저녁을 함께 먹자고 제안한다.
+test_110,#Person1# 은 #Person2# 에게 새해 결심으로 다이어트를 시작하고 정크푸드를 끊을 것이라고 말합니다.
+test_111,Karen Huang은 #Person1# 에게 Comp Lit 287 수업에 등록하고 싶다고 말합니다. #Person1# 은 #Person2# 에게 컴퓨터가 만원이지만 등록할 수 있다고 안내합니다.
+test_112,#Person1# 은 #Person2# 에게 우산을 함께 쓰고 가자고 제안합니다.
+test_113,"Daisy는 Jack에게 자신의 새로운 차를 태워달라고 요청하고, Jack은 동의한다."
+test_114,#Person1# 은 #Person2# 에게 큰불이 밤에 일어났다고 말합니다.
+test_115,"#Person1# 은 #Person2# 에게 계산대까지 안내해 달라고 요청하고, #Person2# 는 이를 수락합니다."
+test_116,#Person2# 는 #Person1# 의 도움으로 일반 세차 패키지를 구매합니다.
+test_117,"해리는 아내와 함께 이집트로 여행을 갈 계획이며, 배로 갈 수도 있다고 #Person1# 에게 말합니다."
+test_118,Johnson은 #Person1# 에게 기계에 대한 조언을 구합니다. #Person1# 은 #Person2# 에게 스트레칭을 잘하고 기계에 적합한 무게를 입력하라고 조언합니다.
+test_119,#Person2# 는 #Person1# 에게 회사가 문을 닫아 실직 중이라고 말합니다. #Person1# 은 #Person2# 에게 면접을 제안합니다.
+test_120,"#Person1# 은 강아지들에게 밥을 주고, 목욕시키며 토요일 오전 11시에 수의사 예약을 상기시킵니다."
+test_121,에이든 집주인 아주머니께 200달러 빚이 있어 #Person1# 에게 돈을 빌려달라고 요청합니다. #Person1# 은 월요일에 월급이 들어올 때까지 돈을 빌려달라고 요청합니다.
+test_122,#Person2# 는 #Person1# 에게 자선 단체에서 일하면서 많은 것을 배웠다고 말합니다.
+test_123,#Person1# 은 #Person2# 에게 전화나 이메일을 통해 연락할 것을 요청합니다.
+test_124,#Person1# 은 #Person2# 에게 모우탄과 베이징 오리 구이를 추천합니다.
+test_125,Dan은 Angela에게 전화를 걸어 다음 주에 결혼한다고 알린다. Angela는 Megan을 데리러 가기로 한다.
+test_126,#Person1# 은 #Person2# 에게 이탈리아 티라미수와 튀긴 바나나를 먹어보라고 제안합니다.
+test_127,Smith 씨는 #Person1# 에게 자신의 전공과 경력을 설명합니다.
+test_128,#Person1# 은 #Person2# 에게 조카에게 줄 선물로 디지털 바비를 구매합니다.
+test_129,#Person2# 는 #Person1# 의 도움으로 조던 운동화를 구매합니다.
+test_130,#Person1# 은 #Person2# 에게 과학박물관으로 가는 길을 안내합니다.
+test_131,사이먼은 #Person1# 에게 직장을 그만둔 후 프로젝트 업무에 지원할 수 있게 되었다고 말합니다. 그는 #Person1# 에게 회사 웹사이트에 자신이 접근할 수 있는 구인 정보를 게시할 수 있다고 설명합니다.
+test_132,Rocky는 #Person1# 에게 자신이 다정하고 모든 필요를 채워주는 여자를 좋아한다고 말합니다. #Person1# 은 #Person2# 가 외향적이고 다정하며 자기 중심적이라고 생각합니다.
+test_133,"#Person1# 은 #Person2# 에게 어젯밤 폭풍으로 창문 몇 개가 부서졌고, 큰 나무 하나가 부러졌다고 말합니다."
+test_134,#Person1# 은 #Person2# 에게 TV를 보는 것이 지루하다고 말합니다. #Person2# 는 #Person1# 에게 함께 시간을 보내자고 제안합니다.
+test_135,Ben은 #Person1# 에게 새 학교 생활에 적응하기 위해 내일 수업을 준비 중이라고 말합니다.
+test_136,Adam은 #Person1# 에게 미시간과의 경기 영상을 보고 싶다고 말합니다. #Person1# 은 미시간의 최근 세 경기 영상을 보고 싶어합니다.
+test_137,#Person1# 은 프린터 고장으로 인해 #Person2# 에게 도움을 요청합니다.
+test_138,#Person1# 은 커튼을 달기 위해 #Person2# 에게 도움을 요청합니다.
+test_139,#Person1# 은 Jack에게 주말 캠핑 계획을 확인하기 위해 달력 확인을 요청합니다.
+test_140,#Person1# 은 #Person2# 에게 임신 사실을 알린다. #Person2# 는 #Person1# 에게 임신 사실을 알린다.
+test_141,#Person2# 는 딸이 대학 결정을 못 하고 있어 #Person1# 에게 조언을 구합니다.
+test_142,"#Person1# 은 #Person2# 에게 일자리를 잃으면 생계 유지에 어려움을 겪을 것이라고 말합니다. #Person2# 는 #Person1# 에게 상사가 정직하지 않다고 말하고, #Person1# 은 #Person2# 에게 돈을 절약할 것을 제안합니다."
+test_143,#Person2# 는 #Person1# 에게 #Person2# 의 친구가 에딘버러 대학의 박사과정 학생이라고 말합니다. #Person1# 은 #Person2# 에게 강연의 주제와 주제를 묻습니다.
+test_144,"#Person1# 은 John네 집에 가고 싶어 하지만, #Person2# 는 감기에 걸렸다고 말합니다."
+test_145,Mr. Faber는 요크 호텔에 전화하여 7월 23일까지 더블 룸을 예약합니다.
+test_146,"#Person1# 은 #Person2# 에게 웨스트 더비를 추천하고, #Person2# 는 플랫을 추천합니다. #Person1# 은 #Person2# 에게 친구 John Godfrey를 소개합니다."
+test_147,#Person2# 는 #Person1# 에게 경찰에게 정지당했을 때 운전하고 있었다고 설명합니다. #Person1# 은 #Person2# 에게 기차 대신 운전하자고 제안합니다.
+test_148,"Dan은 9월 10일에 100대 컴퓨터 주문에 대해 확인하기 위해 전화했습니다. #Person1# 은 Dan의 전화번호를 요청하고, Dan은 6이 두 번이라고 설명합니다."
+test_149,#Person1# 은 #Person2# 에게 워싱턴 포스트 신문의 사본에 대해 설명합니다.
+test_150,#Person2# 의 컴퓨터에 바이러스가 들어왔습니다. #Person1# 은 #Person2# 에게 파일을 압축해서 보내라고 조언합니다.
+test_151,#Person2# 는 #Person1# 에게 주말에 즐거웠던 시간을 이야기합니다.
+test_152,"#Person1# 은 중국 음식을 먹고 싶어 하고, #Person2# 는 Panda Express에서 중국 음식을 먹자고 제안합니다."
+test_153,"톰은 Hans 가구 매장의 메리에게 영업직을 제안했지만, 메리는 다른 후보자가 더 많은 경험이 있어 거절했습니다."
+test_154,"#Person1# 이 #Person2# 에게 전화를 걸었으나, #Person2# 는 #Person1# 이 열 번째 전화라고 말합니다."
+test_155,"#Person2# 는 음악 교사가 되고 싶다고 #Person1# 에게 말합니다. #Person1# 은 음악과 예술에서 학사와 석사 학위를 가지고 있으며, 클래식 음악을 좋아합니다. #Person2# 는 클래식 음악을 듣는 것이 스트레스 해소에 도움이 된다고 설명합니다."
+test_156,#Person1# 은 #Person2# 에게 같은 건물에 사는 여자를 만났다고 말합니다. #Person2# 는 #Person1# 에게 미국 남자 두 명도 그 여자에게 반했다고 말합니다. #Person1# 은 #Person2# 를 저녁 식사에 초대할 계획입니다.
+test_157,#Person1# 은 #Person2# 에게 Mirella가 Silicon Valley에서 회의 참석 후 계속 청바지에 스웨트셔츠를 입고 출근한다고 말합니다. #Person2# 는 Mirella가 서부 해안 스타일에 영향을 받은 것 같다고 생각합니다.
+test_158,"#Person1# 은 #Person2# 의 법률 사무소를 차리려고 하며, #Person2# 는 #Person1# 의 도움에 감사를 표합니다."
+test_159,Kate는 Peter에게 어젯밤에 온라인 게임을 했다고 말합니다.
+test_160,"#Person2# 는 #Person1# 에게 배와 보트가 기차, 비행기, 자동차에게 자리를 내주고 있다고 설명합니다."
+test_161,Andy는 Fanny에게 어젯밤 겪은 끔찍한 경험에 대해 이야기합니다. Fanny는 #Person1# 에게 유령들이 무덤에서 튀어나왔다고 말합니다.
+test_162,"#Person1# 은 Ernie와 함께 밴드를 시작할 계획이며, #Person2# 는 Vanilla Ice 노래를 추천합니다."
+test_163,"#Person1# 은 #Person2# 에게 뉴올리언스로 여행을 다녀왔다고 말하고, 강변 저녁 유람선 투어를 제안합니다."
+test_164,#Person1# 은 #Person2# 의 사이즈에 만족하여 신용카드로 결제합니다.
+test_165,"Blake씨는 Foster에게 교육 매뉴얼을 보내달라고 요청했지만, Foster는 복사 중이라 내일 오후에 전달할 수 없습니다."
+test_166,데이비드는 #Person1# 에게 이번 금요일에 롱아일랜드를 출발하여 솔트레이크시티까지 여행할 계획이라고 말합니다.
+test_167,#Person1# 은 #Person2# 에게 파멜라의 비행기 타기를 재촉합니다. #Person2# 는 #Person1# 에게 파멜라에게 편지를 써달라고 요청합니다.
+test_168,#Person2# 는 #Person1# 에게 77번 도로에서 걸어서 가는 방법을 안내합니다.
+test_169,#Person1# 은 #Person2# 에게 메카로 성지순례 가는 무슬림들을 소개합니다. #Person2# 는 #Person1# 에게 순례자가 많은 이유를 설명합니다.
+test_170,#Person1# 은 #Person2# 에게 중앙 백화점으로 가는 길을 안내합니다.
+test_171,"#Person1# 은 #Person2# 에게 다음 주 며칠 동안 런던에 함께 가자고 제안합니다. #Person2# 는 기차를 타는 것을 선호하고, #Person1# 은 자동차를 선호합니다."
+test_172,"톰은 샌드위치를 받았지만 치킨이 덜 익었다고 케서린에게 말합니다. 케서린은 맥도날드나 KFC 같은 유명 브랜드들을 좋아하지만, 톰은 패스트푸드를 좋아하지 않습니다."
+test_173,#Person2# 는 #Person1# 에게 바비큐 윙과 베이비 백 립을 주문합니다.
+test_174,#Person1# 은 #Person2# 의 도움으로 더블 치즈버거와 감자튀김을 주문합니다.
+test_175,"#Person2# 는 빵을 만들기 위해 머핀을 구웠고, #Person1# 은 반숙 계란과 프라이드 에그를 추천합니다."
+test_176,#Person1# 은 #Person2# 에게 그랜드 호텔로 가는 길을 묻습니다.
+test_177,#Person1# 은 #Person2# 에게 미국 경찰이 어떻게 생겼는지 보여주고 싶다고 요청합니다.
+test_178,#Person1# 은 #Person2# 에게 내일 빈 방을 요청합니다.
+test_179,"#Person2# 는 미국에 공부하러 가기 위해 비자를 신청했고, #Person1# 은 #Person2# 에게 필요한 서류와 학업 관련 서류를 제출하라고 조언합니다."
+test_180,Anne은 #Person1# 에게 피곤해서 일찍 자고 싶다고 말합니다. #Person1# 은 Anne에게 내일 밤 펍에서 술을 마시자고 제안합니다.
+test_181,Mary는 #Person1# 에게 인터넷 쇼핑이 편리하고 비용이 저렴하다고 설명합니다.
+test_182,#Person2# 는 #Person1# 에게 미국식 회계에 익숙하지 않다고 말합니다.
+test_183,"피터는 여름에 시안을 방문하고 싶다고 제인에게 말합니다. 제인은 피터에게 피터와 함께 하얼빈에 가자고 제안하고, 피터는 동의합니다."
+test_184,#Person1# 은 #Person2# 의 도움으로 로맨스 영화를 빌립니다. #Person2# 는 #Person1# 에게 영화 5편을 대여할 수 있는 5달러짜리 카드를 제공합니다.
+test_185,"#Person1# 은 Mr. Lee의 소포를 찾고 있으며, #Person2# 는 소포를 찾지 못하고 있습니다."
+test_186,#Person1# 은 #Person2# 에게 공항이 닫혀서 내일 아침까지 비행기가 출발하지 않는다고 알립니다.
+test_187,#Person1# 은 컴퓨터 도움으로 #Person2# 에게 대접을 받습니다.
+test_188,#Person1# 은 불면증으로 인해 잠을 잘 못 자고 있습니다. #Person2# 는 #Person1# 에게 요가 수업을 듣거나 이완 테크닉을 배우라고 조언합니다. #Person1# 은 #Person2# 에게 음악을 들으라고 제안합니다.
+test_189,#Person1# 은 #Person2# 에게 주방을 확 바꾸고 싶다고 말합니다.
+test_190,Walter와 Sterling은 Professor Wood에 대해 이야기한다.
+test_191,"#Person1# 은 #Person2# 에게 상담할 수 있는 시간을 예약해 달라고 요청하고, #Person2# 는 이를 수락합니다."
+test_192,Martin은 이번 시험 준비에 대해 Eliza 선생님에게 감사를 표합니다. Eliza 선생님은 Martin에게 학생 복지회 도움이 도움이 되었다고 생각합니다.
+test_193,#Person1# 은 #Person2# 에게 소포를 한국으로 보내달라고 요청합니다.
+test_194,#Person1# 은 Linda에게 호텔 방에 있는 휴대폰을 찾아달라고 요청합니다. Linda는 #Person1# 에게 여동생이 핸드폰을 잃어버렸다고 전하라고 조언합니다.
+test_195,#Person2# 는 #Person1# 에게 로스앤젤레스로 가는 비행기 탑승을 안내합니다.
+test_196,"#Person2# 는 여름 방학 동안 삼촌 회사에서 아르바이트를 하며 경험을 쌓을 계획이며, #Person1# 은 졸업 후 여행을 계획하고 있다."
+test_197,Mary는 #Person1# 에게 12번 집의 정원 문이 잠겨 있었다고 말합니다. #Person1# 은 #Person2# 에게 나무의 큰 가지를 보지 못했다고 말합니다.
+test_198,"#Person1# 은 #Person2# 에게 회사에서 6년 동안 일했다고 말합니다. #Person2# 는 #Person1# 에게 회사에서 새로운 기술 개발에 도움을 주며, 여행을 갈 기회는 많지 않다고 말합니다."
+test_199,#Person1# 은 #Person2# 의 도움을 받아 사회보장번호와 신분증을 확인하고 계좌를 개설합니다.
+test_200,"#Person1# 은 #Person2# 에게 중국 음식을 추천하지만, #Person2# 는 매운 음식을 좋아하지 않습니다. 결국 #Person1# 은 전취덕 식당을 추천합니다."
+test_201,#Person1# 은 #Person2# 에게 양털이 최대한 빨리 도착하기를 희망합니다. #Person2# 는 #Person1# 에게 오클랜드를 떠나는 첫 배에 주문을 실어주기로 했습니다.
+test_202,#Person1# 은 독서등을 깨뜨려 #Person2# 에게 변상을 요청합니다.
+test_203,#Person1# 은 #Person2# 에게 2006 회계연도 마케팅 계획에 대해 설명합니다. #Person2# 는 #Person1# 에게 올해 매출 증가와 매출 증가에 대해 설명합니다.
+test_204,"#Person1# 은 #Person2# 에게 휴가 계획에 대해 묻습니다. #Person2# 는 파리에서 출발하여 밀라노로 갈 예정이며, 영국에서 페스티벌에 참석할 계획입니다."
+test_205,Jimmy Fox는 Mr. Fox에게 중형차를 예약했으나 차가 모두 나갔다고 말합니다. Mr. Fox는 Jimmy Fox를 위해 파란색 포드 포커스가 준비되어 있다고 설명합니다.
+test_206,#Person1# 은 아빠가 서재에서 일하는 것을 알고 #Person2# 에게 카드게임을 부탁합니다.
+test_207,"Ann은 Mr. Jones에게 오늘 오후 5시에 회계사와 회의가 있으며, 목요일에는 Ms. Von과 대화를 원한다고 말합니다."
+test_208,"#Person2# 는 #Person1# 에게 세계 지도를 보고 있으며, 지도가 나라별로 표시되어 있지 않다고 설명합니다. #Person1# 은 #Person2# 의 지리 수업에 참석할 계획입니다."
+test_209,#Person2# 는 #Person1# 에게 금연 방을 요청합니다.
+test_210,"Bill은 John Sampson에게 젖어 있는 페인트에 손대지 말라고 주의를 줬지만, John Sampson은 표지판을 가지러 창고로 갔다."
+test_211,#Person1# 과 #Person2# 는 다음 주에 다시 만나기로 약속합니다.
+test_212,Bill과 Jim은 친구 Dick에 대해 이야기한다.
+test_213,"#Person1# 은 #Person2# 에게 상사가 야근을 통제하고 있다고 말합니다. #Person2# 는 #Person1# 에게 보너스를 제안하지만, #Person1# 은 다른 직장을 찾지 못할까 봐 걱정합니다."
+test_214,Lisa는 남편 Mark가 바람 피우고 있다는 것을 알게 되었다고 #Person1# 에게 말합니다. #Person1# 은 Mark가 두 달 전부터 다른 사람을 만나고 있다는 것을 알고 화가 났습니다.
+test_215,#Person2# 는 #Person1# 에게 빨간 고기를 줄이고 식단을 정리하라고 조언합니다.
+test_216,"#Person1# 은 #Person2# 에게 사랑을 고백하고, #Person2# 는 #Person1# 의 곁에 머물기를 원합니다."
+test_217,#Person2# 는 #Person1# 에게 도서관 이용 방법을 안내합니다.
+test_218,#Person1# 과 #Person2# 는 날씨에 대해 이야기하고 있습니다. #Person1# 은 #Person2# 에게 날씨가 좋으면 해변에 가자고 제안합니다.
+test_219,#Person1# 은 #Person2# 에게 카메라를 잠시 보관하고 나중에 돌려주겠다고 제안합니다.
+test_220,"#Person2# 는 대출 신청에 대한 정보를 얻기 위해 #Person1# 에게 도움을 요청합니다. #Person1# 은 대출 정책의 일반적인 조건을 설명하고, #Person2# 는 대출 승인 절차를 안내합니다."
+test_221,"모니카는 #Person1# 의 발표에 감명을 받았고, #Person1# 은 그의 발표를 칭찬합니다."
+test_222,"톰은 #Person1# 에게 내일 함께 뛰자고 제안하고, #Person1# 은 동의한다."
+test_223,"#Person1# 은 #Person2# 에게 일본 레스토랑에 대해 문의합니다. #Person2# 는 일본 요리를 세트 코스로 제공하고, 고기 요리를 제공한다고 설명합니다."
+test_224,Simpson 씨는 #Person1# 에게 목요일에 점심을 함께하자고 제안합니다.
+test_225,"#Person1# 은 #Person2# 에게 데이트 상대와 레스토랑에 가자고 제안하고, #Person2# 는 그레이머시 타번을 추천합니다."
+test_226,#Person1# 은 #Person2# 에게 팁을 제공하지 않습니다.
+test_227,"#Person2# 는 #Person1# 에게 자신의 나라에서는 축구를 좋아하고, #Person1# 은 익스트림 스포츠를 좋아한다고 말합니다. #Person1# 은 #Person2# 에게 럭비를 좋아한다고 말합니다."
+test_228,#Person2# 는 #Person1# 의 도움으로 핀란드 헬싱키로 가는 항공편을 예약합니다.
+test_229,#Person1# 은 #Person2# 에게 플로리다로 디즈니 월드에 가자고 초대합니다.
+test_230,#Person1# 은 #Person2# 에게 호주를 방문하고 싶다고 말합니다.
+test_231,"Laura는 #Person1# 에게 헬스장에 가자고 제안하지만, #Person1# 은 운동하는 여자들이 남성들보다 더 많다고 말합니다. Laura는 #Person1# 에게 함께 헬스장에 가자고 제안합니다."
+test_232,#Person2# 는 #Person1# 에게 로스앤젤레스에서 태어났고 뮌헨에서 살았다고 말합니다.
+test_233,"#Person1# 은 #Person2# 의 새 정장을 칭찬하지만, #Person2# 는 그것이 좋은 거래라고 생각합니다."
+test_234,"Ann은 Martha Bicycle Club의 회장이며, Martha Bicycle Club의 회장인 Robin을 인터뷰합니다. Robin은 Martha Bicycle Club의 회장이며, Martha B"
+test_235,#Person1# 은 #Person2# 에게 아페리티프와 시그니처 칵테일을 주문합니다.
+test_236,"Eric은 Gregory에게 점심을 먹으러 가자고 제안하지만, Gregory는 돈이 부족해서 거절한다."
+test_237,#Person1# 은 #Person2# 에게 노르망디 상륙작전에 대한 정보를 요청합니다. #Person2# 는 #Person1# 에게 www.google.com에 가서 노르망디 상륙작전을 입력하라고 조언합니다.
+test_238,#Person1# 은 #Person2# 에게 근육의 선명도를 위해 기계를 사용해보라고 조언합니다. #Person2# 는 근육이 불룩해지지 않기 위해 기계를 사용합니다.
+test_239,#Person1# 은 #Person2# 에게 캠퍼스 내에 주차할 수 있는 주차 건물을 안내합니다.
+test_240,Emily는 Susan에게 FICA와 SUI 세금의 정의와 주 소득세에 대해 설명합니다.
+test_241,#Person1# 은 #Person2# 에게 자판기 구매 방법을 묻습니다. #Person2# 는 #Person1# 에게 슬롯에 돈을 넣으라고 조언합니다.
+test_242,#Person1# 은 겨울 방학에 태국에 있는 여자친구를 만나러 가려고 합니다. #Person2# 는 #Person1# 에게 태국에 있는 여자친구가 있다고 말합니다.
+test_243,케이트와 제임스는 새로 산 가구 세트에 대해 이야기한다. 케이트는 새 가구 세트를 마음에 들어 한다.
+test_244,Bill은 #Person1# 에게 자신의 하루 운동 일정표를 설명합니다.
+test_245,"마켓은 #Person1# 에게 과학 과목에 등록할 것을 제안하고, #Person1# 은 이에 동의합니다."
+test_246,"Tim은 #Person1# 에게 환경 친화적인 삶을 사는 방법에 대해 이야기합니다. Tim은 과학 수업에서 환경 친화적인 삶을 살 수 있는 방법을 배웠으며, 학교에 있을 때 재활용 종이를 사용한다고 말합니다."
+test_247,토니는 크리스마스가 다가오는데 모든 것이 잘 풀리지 않아 피곤하다고 #Person1# 에게 말합니다. #Person1# 은 토니에게 크리스마스 전에 아이들 선물을 파는 것이 불쾌한 일이라고 말합니다.
+test_248,"Bill은 Sue에게 생일 파티를 위해 케이크를 먹어보라고 제안하지만, Sue는 다이어트 중이라 거절한다."
+test_249,"#Person2# 는 여름 옷을 찾고 있으며, #Person1# 은 티셔츠와 어울리는 치마를 추천합니다."
+test_250,#Person1# 은 #Person2# 의 예약 확인서를 확인하지 않았습니다.
+test_251,#Person1# 은 #Person2# 에게 뷔페식 파티에서 어린애부터 어른까지 모두 참석했다고 말합니다.
+test_252,#Person1# 은 #Person2# 에게 아들에게 나쁜 습관이 생겼다고 말합니다. #Person2# 는 #Person1# 에게 토니에게 애정과 인내심을 가지라고 조언합니다.
+test_253,#Person1# 은 #Person2# 에게 친구 Julie와 Alex의 결혼 소식을 전합니다. #Person2# 는 #Person1# 에게 파티에 가자고 제안합니다.
+test_254,#Person2# 는 #Person1# 의 도움을 받아 투표용지를 받습니다.
+test_255,"#Person1# 은 #Person2# 에게 회사가 곧 인원 감축을 한다고 알린다. #Person2# 는 #Person1# 에게 조지가 아첨을 잘하고, 앤디가 사장님 처제와 잘 어울린다고 말한다. #Person1# 은 #Person2# 에게 마이클이 해고될까 걱정한다."
+test_256,#Person2# 는 #Person1# 에게 중국 드라마 '중국식 이혼'을 보고 있다고 말합니다. #Person1# 은 #Person2# 에게 이혼율이 최근 몇 년 동안 증가했다고 설명합니다.
+test_257,"#Person1# 은 Judy에게 예산에 대해 묻고, Judy는 교통비와 호텔비로 많은 돈을 소비해야 한다고 설명합니다."
+test_258,#Person1# 은 #Person2# 에게 메리의 결혼 소식을 전합니다.
+test_259,#Person1# 은 지갑을 잃어버려 #Person2# 에게 도움을 요청합니다. #Person2# 는 #Person1# 에게 책을 사고 주유소에 가자고 제안합니다.
+test_260,#Person1# 은 #Person2# 에게 Murphy Music과 U-Tunes가 합병했다는 소식을 전합니다. #Person2# 는 그 소식을 믿기 어려워합니다.
+test_261,조는 #Person1# 에게 새 조수를 만났지만 거만하다고 말합니다.
+test_262,"Sarah는 회의가 잘 되지 않아 속상해하고 있다. #Person1# 은 회의 주제가 사무실 워크플로우 개선이었으며, 회의가 효율적이지 않았다고 설명한다. Sarah는 회의 주제가 짧고 간결하다고 조언한다."
+test_263,#Person2# 는 #Person1# 에게 메카로 순례 가는 무슬림들을 소개합니다. #Person1# 은 #Person2# 에게 순례자 수를 제한하는 이유를 설명합니다.
+test_264,"Ted는 Mike에게 Jenny를 좋아한다고 말하고, Mike는 Jenny에게 데이트 신청을 권유합니다."
+test_265,#Person2# 는 #Person1# 에게 화가 났을 때 음악을 듣거나 운동을 하라고 제안합니다.
+test_266,#Person1# 은 #Person2# 에게 뉴질랜드에 있는 가족에 대해 묻습니다. #Person2# 는 #Person1# 의 삼촌 Bill과 그의 딸인 Sarah를 소개합니다.
+test_267,Stuart 씨는 #Person1# 의 도움으로 도시 마라톤에서 우승했습니다.
+test_268,#Person2# 는 아이들과 아내를 위한 선물을 고르고 있습니다. #Person1# 은 #Person2# 에게 스니커즈와 DENY 브랜드를 추천합니다.
+test_269,홍은 #Person1# 에게 영국으로 전화하기 위해 현지 SIM 카드를 사용해보라고 제안합니다.
+test_270,"Mr. Brown은 한 달에 1,800위안을 받으며, #Person1# 은 #Person2# 의 능력과 경험에 따라 결정해 주겠다고 제안합니다."
+test_271,#Person1# 과 Barry는 Barry의 형 Paul에 대해 이야기합니다. #Person1# 은 Barry가 정중하고 신중하며 수줍음이 많다고 생각합니다.
+test_272,"#Person1# 은 파사디나나 아카디아에 있는 중간 크기의 집을 찾고 있으며, #Person2# 는 호수 근처의 전망 좋은 집을 추천합니다."
+test_273,Grant 씨는 샘플을 두고 가기로 결정했습니다.
+test_274,#Person2# 는 #Person1# 에게 PHS에서 Sons로 가는 직행 버스를 안내합니다.
+test_275,Mr. Lee는 Mrs. Word를 집까지 태워다 주기로 했습니다.
+test_276,#Person1# 은 #Person2# 에게 자켓과 셔츠를 벗고 침대에 누워 달라고 요청합니다. #Person2# 는 #Person1# 에게 어깨 엑스레이를 찍으라고 조언합니다.
+test_277,설리는 호텔 로비 바에서 방으로 요금 청구할 때 사용했던 카드를 잃어버려 #Person1# 에게 도움을 요청합니다.
+test_278,"#Person1# 은 #Person2# 에게 낮잠을 잘 자자고 제안하고, #Person2# 는 동의합니다."
+test_279,#Person2# 는 #Person1# 의 도움으로 중국 음식을 주문합니다. #Person1# 은 #Person2# 에게 밸류 밀 두 개와 소고기를 추천합니다.
+test_280,"#Person1# 과 #Person2# 는 필요한 식기를 챙기고, 필요한 식기를 챙기며 줄을 서고 있습니다."
+test_281,"Lucy는 Stanley의 노래를 듣고 싶어 하지만, Stanley는 노래를 듣지 않습니다."
+test_282,#Person1# 과 #Person2# 는 영화 상영의 개념을 바꿔야 한다고 생각합니다.
+test_283,#Person1# 은 #Person2# 에게 봄에는 실크와 면 드레스를 추천합니다.
+test_284,"Joshua는 #Person1# 에게 용돈 13달러를 주려고 하지만, #Person1# 은 은행이 닫혔을 것이라고 말합니다."
+test_285,"#Person1# 은 #Person2# 에게 Mike의 파티 초대장을 받았는지 묻고, #Person2# 는 Mike에게 전화해 물어보겠다고 한다."
+test_286,#Person1# 은 #Person2# 에게 소포를 우선우편으로 보내고 싶다고 요청합니다.
+test_287,#Person2# 는 #Person1# 에게 지진이 세계에서 가장 무서운 자연재해라고 말합니다. #Person1# 은 #Person2# 에게 원촨 8.0 강진을 경험했다고 이야기합니다.
+test_288,#Person1# 은 #Person2# 에게 장마가 곧 끝날 것이라고 말합니다.
+test_289,#Person1# 과 배구 경기 후 #Person2# 에게 올림픽 기념품 가게에 가자고 제안합니다. #Person2# 는 #Person1# 에게 빨간 마스코트를 추천합니다.
+test_290,#Person1# 은 #Person2# 의 도움으로 16인치 알루미늄 팬을 구매합니다.
+test_291,#Person1# 과 #Person2# 는 퇴근 후 다시 일하러 가기로 했습니다.
+test_292,#Person1# 은 Mr. Becker에게 워싱턴의 관료들이 그들의 직업을 좋아한다고 말합니다. Mr. Becker는 #Person1# 에게 많은 직책이 민간 업계와 비슷한 급여를 지급한다고 설명합니다.
+test_293,"Pete는 Henry Johnson을 소개하고, Henry Johnson은 베이징 사무실에서 1년 넘게 일하고 있다고 설명합니다. Pete는 브루클린에서 태어나 브루클린에서 자랐다고 말합니다. Henry Johns"
+test_294,"Julie는 Mr. Jones에게 지난 일요일부터 아팠다고 말합니다. Mr. Jones는 Julie가 식중독일 수 있다고 생각하지만, Julie는 괜찮다고 말합니다."
+test_295,"Mike의 엄마는 Mike에게 음료수를 사오라고 요청하고, Mike는 이를 수락합니다."
+test_296,"#Person1# 은 #Person2# 에게 베를린으로 가는 버스 여행에 대해 이야기합니다. #Person2# 는 버스가 불편하다고 느끼지만, #Person1# 은 괜찮다고 생각합니다."
+test_297,"#Person2# 는 #Person1# 에게 여행과 사람 만나는 것을 좋아하며, 외국어 능력에 대해 이야기합니다."
+test_298,에이미는 제니와 빌이 피크닉 초대를 해서 피크닉 초대를 받았다고 #Person1# 에게 말합니다. 에이미는 베이하이 공원에서 저녁을 먹고 산책하며 경치를 즐겼습니다.
+test_299,Peter는 #Person1# 에게 정원에 물을 줘야 한다고 말합니다.
+test_300,#Person1# 은 #Person2# 에게 긴급 회의를 빨리 소집할 것을 요청합니다.
+test_301,#Person2# 는 #Person1# 의 도움으로 편지에 쓸 우표를 구매합니다.
+test_302,Mr. Smith는 #Person1# 에게 항생제와 가려움증과 화끈거림을 완화할 크림을 처방합니다.
+test_303,"#Person1# 은 #Person2# 의 가게에서 천 가지 이상의 중국식 손재품을 구매하고 싶어합니다. #Person2# 는 종이 공예품, 자수, 바틱을 추천합니다."
+test_304,#Person1# 과 #Person2# 는 에펠탑에 대해 이야기합니다.
+test_305,Brian은 #Person1# 에게 대학에서 영어를 배웠다고 말합니다.
+test_306,#Person1# 은 초조해 보인다. #Person2# 는 #Person1# 에게 걱정하지 말라고 조언한다.
+test_307,"#Person1# 은 #Person2# 에게 모든 것이 계획대로 진행되었다고 말하고, #Person2# 는 #Person1# 에게 경고하지 말라고 조언합니다."
+test_308,#Person1# 과 #Person2# 는 John이 일주일에 7번 데이트하는 것에 대해 이야기한다.
+test_309,"#Person1# 과 #Person2# 는 런던의 역사적인 도시에 대해 이야기합니다. #Person1# 은 넬슨 기념탑, 보우디카 동상, 엘리자베스 1세 여왕, 그리고 유명한 성과 감옥을 방문할 예정입니다."
+test_310,"다니엘은 과학을 좋아하고, #Person1# 은 체육을 좋아합니다. #Person1# 은 과학에 흥미가 있으며, #Person2# 는 과학을 좋아합니다."
+test_311,"#Person1# 은 #Person2# 에게 베이비 샤워를 요청하고, #Person2# 는 베이비 샤워를 준비합니다."
+test_312,"#Person1# 은 중국에 관광하러 가고 싶어하지만, #Person2# 는 바빠서 갈 수 없다고 한다."
+test_313,Tim과 Karren은 서로 인사를 나누고 가끔 만나기로 했다.
+test_314,#Person1# 은 #Person2# 에게 어젯밤 Michael의 새 오토바이를 사고 싶다고 말합니다.
+test_315,"#Person1# 은 #Person2# 에게 몇 개의 언어에 능숙하며, 영어와 프랑스어를 구사할 수 있다고 말합니다."
+test_316,#Person1# 은 타일러의 여동생 낸시에게 전화를 걸어 그녀의 목소리를 전달합니다.
+test_317,#Person1# 은 뉴욕행 비행기가 취소되었다고 알립니다. #Person2# 는 #Person1# 에게 내일 비행기를 예약해 달라고 요청합니다.
+test_318,"#Person1# 과 #Person2# 는 점심을 먹으러 버거 퀸에 가기로 했습니다. #Person1# 은 치즈버거를 좋아하고, #Person2# 는 밀크셰이크를 좋아합니다. #Person1# 은 #Person2# 에게 인내심을 가지라고 조언합니다."
+test_319,#Person1# 은 #Person2# 에게 초과 수하물 요금 지불을 안내합니다.
+test_320,"#Person1# 은 목이 말라 탄산음료를 마시고 싶어 하지만, #Person2# 는 탄산음료가 건강에 좋지 않다고 설명합니다."
+test_321,Wang Miao는 AB 회사의 Wang Miao에게 Mr. Green과의 약속에 대해 문의합니다.
+test_322,#Person1# 은 30 사이즈의 에나멜 가죽 구두를 구매합니다.
+test_323,"Benjamin은 프로젝트 보고서를 어떻게 작성해야 할지 고민하고 있다. #Person1# 은 Benjamin에게 프로젝트 보고서를 어떻게 작성해야 할지 묻고, Benjamin은 마이크로소프트 워드를 잘 알지 못한다."
+test_324,Marty는 #Person2# 의 도움으로 중간 크기 피자를 주문합니다.
+test_325,"#Person1# 은 #Person2# 에게 새우 칵테일과 계란 수프, 미네랄 워터를 주문합니다."
+test_326,#Person2# 는 #Person1# 에게 주방과 주방이 현대적이라고 설명합니다.
+test_327,#Person2# 는 #Person1# 의 가게에서 개인 스테레오를 구매했으나 #Person1# 의 가게에서 큰 스크래치가 났습니다. #Person1# 은 #Person2# 에게 소음을 듣지 못한다고 설명합니다. #Person2# 는 #Person1# 에게 영수증을 요청합니다.
+test_328,"#Person2# 는 기숙사 보증금을 아직 납부하지 않았습니다. #Person1# 은 #Person2# 에게 기숙사 방을 추천하며, #Person2# 는 #Person1# 에게 도서관에서 공부하라고 제안합니다."
+test_329,#Person2# 는 #Person1# 에게 오래된 동화책을 보여주며 그 책을 사서 도서관에서 그 이름을 찾아보라고 제안합니다.
+test_330,#Person1# 은 #Person2# 에게 베이징 맛집을 안내합니다. #Person2# 는 창가 쪽 테이블만 가능하다고 안내합니다. #Person1# 은 20분 후에 음식을 준비할 예정입니다.
+test_331,"#Person1# 은 아들에게 편지를 보내고 싶어 하며, #Person2# 는 #Person1# 에게 등기 우편과 배달 증명 우편을 추천합니다."
+test_332,Sally와 John은 결혼 후 처음으로 Tom의 편지에 대해 이야기한다.
+test_333,#Person1# 은 과제를 컴퓨터로 해야 한다고 #Person2# 에게 말합니다.
+test_334,#Person1# 과 #Person2# 는 이번 주말에 소풍을 가기로 결정합니다.
+test_335,#Person1# 은 #Person2# 에게 참고 자료 데스크에서 일반 정보를 찾는 방법을 안내합니다.
+test_336,#Person1# 은 프렌치 가든 레스토랑에서 #Person2# 에게 음료 주문을 요청합니다.
+test_337,#Person1# 은 #Person2# 에게 레모네이드와 베이비백 립스를 주문합니다.
+test_338,"#Person1# 은 #Person2# 에게 물, 커피, 디저트를 요청합니다."
+test_339,#Person1# 은 #Person2# 에게 Eric이 데이트를 신청하면 복권에 당첨되어 세계 여행 티켓 두 장을 구매할 것이라고 말합니다.
+test_340,"#Person1# 은 Jack의 새로운 애완동물 사진을 칭찬하고, Jack은 그 사진이 귀엽다고 말합니다."
+test_341,"#Person1# 은 #Person2# 에게 Jane 이모가 Tom에게 새 자전거를 사줬다고 말합니다. #Person2# 는 Tom의 자전거가 얌전하다고 생각하지만, #Person1# 은 버스가 아직 오지 않아 걱정합니다."
+test_342,#Person2# 는 #Person1# 의 도움으로 최신 유행의 치마를 구매합니다.
+test_343,#Person2# 는 #Person1# 에게 #Person2# 의 도시가 200년 전에 작은 마을에 불과했다고 설명합니다. #Person2# 는 #Person1# 에게 펍으로 남아 있는 마을에 대해 이야기합니다.
+test_344,#Person1# 과 #Person2# 는 환경 문제를 해결하기 위해 세계 지도자들이 모여 행동 계획에 합의하기를 희망합니다. #Person1# 은 환경 보호를 위한 조직에 가입하는 것을 제안합니다.
+test_345,#Person1# 은 #Person2# 에게 채팅방에서 사람들과 대화하는 데 많은 시간을 보내고 있다고 말합니다. #Person2# 는 #Person1# 이 미스 라이트라고 생각하는 남자를 만났다고 생각합니다.
+test_346,Nathan은 #Person1# 에게 여름 방학 동안 시카고에 실습 가게 될 것이라고 말합니다. Nathan은 #Person1# 에게 대도시에서 잘할 수 있을 것이라고 안심시킵니다.
+test_347,#Person2# 는 토요타 카롤라를 빌리기 위해 #Person1# 의 도움을 받습니다.
+test_348,"#Person1# 은 다음 주 뉴욕에서 비즈니스 계약을 체결할 예정이며, #Person2# 는 뉴욕의 대학들을 추천합니다."
+test_349,#Person1# 은 #Person2# 에게 필름을 현상해 달라고 요청합니다.
+test_350,#Person1# 은 #Person2# 에게 비행기 지연에 대해 문의합니다. #Person2# 는 폭우로 인해 지연되었다고 설명합니다. #Person1# 은 최신 기상 예보에 따라 날씨가 변할 것이라고 말합니다.
+test_351,#Person1# 은 #Person2# 에게 북경대학으로 가는 길을 묻습니다.
+test_352,#Person1# 은 #Person2# 에게 오늘과 내일의 날씨에 대해 이야기합니다.
+test_353,"#Person1# 은 컴퓨터 게임을 싫어하지만, #Person2# 는 컴퓨터 게임을 좋아합니다."
+test_354,"Jim은 #Person1# 에게 저녁에 맥주를 마시자고 제안하고, #Person1# 은 이에 동의한다."
+test_355,#Person1# 과 #Person2# 는 새우찜과 와인을 주문합니다.
+test_356,#Person2# 는 #Person1# 에게 외국인 관광객 몇 명을 안내한 경험이 있다고 말합니다.
+test_357,Jack은 더블룸을 3박 예약했습니다.
+test_358,마크는 데이빗의 생일 파티에 참석하지 않았습니다. 마크는 #Person1# 에게 데이빗의 부인이 어젯밤에 딸을 낳았다고 말합니다.
+test_359,"#Person1# 은 #Person2# 에게 내일 밤 함께 극장에 가자고 제안하지만, #Person2# 는 거절합니다."
+test_360,#Person2# 는 #Person1# 에게 Cal Ripken의 홈런으로 5 대 4로 역전했다고 말합니다. #Person1# 은 볼티모어가 이기고 있다고 생각합니다.
+test_361,#Person1# 은 #Person2# 의 도움에 감사를 표합니다.
+test_362,"#Person2# 는 #Person1# 에게 자신의 나라는 천연자원을 수출하며, 베네수엘라에서 일부 석유를 수입하고 있다고 설명합니다. #Person1# 은 #Person2# 에게 장기 프로젝트에 투자하라고 조언합니다."
+test_363,"#Person1# 은 #Person2# 에게 미술 전시회에 가는 것을 좋아한다고 말하고, #Person2# 는 미술관에 가는 것을 좋아합니다. 그들은 내일 국립 미술관에서 열리는 그리스와 로마 조각 전시회에 함께 가기로 합니다."
+test_364,#Person2# 는 #Person1# 의 도움으로 책을 반납하고 비디오를 대출합니다.
+test_365,#Person1# 은 #Person2# 에게 10프레임으로 구성된 볼링 게임을 소개합니다.
+test_366,"#Person2# 는 #Person1# 에게 새로운 서비스에 대해 설명하고, #Person1# 은 #Person2# 에게 맞춤형 상담 서비스를 제공합니다."
+test_367,#Person1# 은 #Person2# 에게 짐을 맡길 수 있는 장소와 보증금에 대해 문의합니다.
+test_368,#Person2# 는 #Person1# 에게 어른 두 명과 아이 한 명이 뷔페를 이용한다고 설명합니다.
+test_369,#Person2# 는 #Person1# 에게 해외 유학 개인 대출과 나이 제한에 대해 설명합니다.
+test_370,#Person1# 은 #Person2# 에게 영어 노래가 있는 책을 추천합니다.
+test_371,#Person2# 는 #Person1# 에게 자신의 신문사에 지원한 이유를 설명합니다.
+test_372,잭은 #Person1# 에게 인터뷰 결과를 직접 물어보라고 제안합니다. #Person1# 은 이메일 보내는 것을 제안합니다.
+test_373,#Person2# 는 #Person1# 에게 마당으로 가는 길을 안내합니다.
+test_374,"#Person1# 은 #Person2# 에게 호텔에서 40분 정도 체크아웃할 것을 권하지만, #Person2# 는 보증금이 부족하다고 말합니다."
+test_375,브랜든은 #Person1# 에게 새로운 웹사이트에 가입하여 글쓰기 실력을 향상시키고 있다고 말합니다. #Person1# 은 #Person2# 에게 컴퓨터를 꺼버릴 것이라고 말합니다.
+test_376,"#Person1# 은 #Person2# 에게 교장 선생님이 새 실험실 건물을 지으실 것이라고 말하고, #Person2# 는 그 계획이 가능하다고 생각합니다."
+test_377,Henry는 #Person1# 에게 은행에서 받은 신용카드를 사용하게 된 과정을 설명합니다.
+test_378,Mr. Smith는 #Person1# 에게 내일 산간 지역의 마을을 방문하고 싶다고 말합니다.
+test_379,Vet은 #Person1# 에게 자신이 치어리더가 되고 싶지만 자유를 잃었다고 말합니다. #Person1# 은 Vet에게 어린 시절을 보내라고 조언합니다.
+test_380,#Person2# 는 #Person1# 에게 열 살 때 우표 수집에 관심을 가지게 된 계기와 처음 우표에 그려진 그림에 대해 설명합니다.
+test_381,"Tom은 #Person1# 에게 자신의 회사를 소유하고 싶다고 말합니다. 그의 가족은 부다페스트를 떠나 캐나다에 정착했으며, #Person1# 은 그의 생활에서 녹색을 강조합니다."
+test_382,#Person1# 은 #Person2# 에게 네즈든의 보행자 지하도에서 발견된 40대 남성의 사망 사건을 설명합니다. #Person2# 는 그 남자가 새벽 1시 30분에 네즈든 레인에 있는 술집인 레벨 원 클럽을 떠났을 가능성을 제기합니다.
+test_383,"Bob과 Sherry는 친구 결혼식에 참석하기 위해 퀘벡에 가기로 했다. Bob은 퀘벡 시티를 방문하고 싶어하며, Sherry는 퀘벡 시티를 추천한다."
+test_384,"톰은 제인에게 학생 센터에 수영하러 가자고 제안하지만, 제인은 시험 준비로 인해 거절한다."
+test_385,"#Person1# 은 허리가 아프다고 말하며, #Person2# 는 약을 복용하라고 조언합니다."
+test_386,"#Person1# 은 #Person2# 에게 200위안을 빌려달라고 요청하고, #Person2# 는 이를 수락합니다."
+test_387,#Person1# 은 글씨를 더 잘 쓰고 싶어서 몇 주 동안 연습했지만 변화가 없었습니다. #Person2# 는 #Person1# 에게 끈기를 가지라고 조언합니다.
+test_388,#Person1# 은 속눈썹을 올리고 있는 #Person2# 에게 속눈썹 컬러에 겁먹었다고 말합니다.
+test_389,"#Person1# 은 #Person2# 에게 운전 강좌에 대해 문의합니다. #Person2# 는 주말에 운전 강좌를 진행하며, 강사들을 소개합니다."
+test_390,"티나는 #Person1# 에게 7살 때 피아노를 시작했으며, 매주 토요일 그 선생님을 방문한다고 말합니다."
+test_391,"#Person1# 은 #Person2# 에게 자신의 강점, 약점, 교육에 대해 묻습니다. #Person2# 는 #Person1# 에게 배우는 과정이 중요하다고 말합니다."
+test_392,Stephanie는 몸이 좋지 않다. George는 Miss Jenkins에게 이야기하여 금요일 아침까지 보고서를 제출할 것을 제안한다.
+test_393,"David와 #Person1# 은 크리스마스 계획에 대해 이야기한다. David는 뉴욕에서 크리스마스를 보내자고 제안하고, #Person1# 은 이에 동의한다."
+test_394,"Bob은 지난 주말 댄스 파티에 참석했고, #Person1# 은 토요일 아침에 TV를 보고 일요일에는 쇼핑을 했습니다."
+test_395,"#Person1# 은 #Person2# 에게 50달러를 빌려달라고 요청합니다. #Person2# 는 직장을 구하고 있으며, #Person1# 은 #Person2# 에게 행운을 빕니다."
+test_396,#Person1# 은 #Person2# 에게 레스토랑에서 모든 손님에게 재킷과 넥타이를 착용해 달라고 요청합니다. #Person2# 는 회의 시간을 9시 30분으로 변경합니다.
+test_397,#Person1# 은 #Person2# 에게 휴양 캠프에 대해 묻습니다. #Person2# 는 #Person1# 에게 여러 가지 활동을 설명합니다.
+test_398,#Person1# 은 #Person2# 에게 대학 입학 요건에 대해 묻습니다. #Person2# 는 직장을 그만두고 컴퓨터 프로그래밍을 전공하고 싶어합니다.
+test_399,#Person1# 은 #Person2# 에게 클락 교수님이 나무를 들이받아 며칠 학교를 빠져야 한다고 알립니다.
+test_400,#Person1# 은 집주인과 수리 비용 문제로 갈등을 겪고 있습니다. #Person2# 는 집주인이 집주인에게 전화를 걸어 수리 비용을 지불하지 않겠다고 약속합니다.
+test_401,#Person2# 는 #Person1# 의 도움을 받아 도쿄에서 온 수출 L/C를 수령합니다.
+test_402,Myrdal은 Charlie에게 지갑을 잃어버렸다고 말합니다. Charlie는 지갑이 사라졌다고 생각합니다.
+test_403,#Person1# 은 #Person2# 에게 번갈아가며 설거지를 하자고 제안합니다.
+test_404,"#Person1# 은 #Person2# 에게 사랑을 고백하고, #Person2# 는 #Person1# 을 사랑한다고 말합니다."
+test_405,"#Person1# 과 #Person2# 는 정부가 많은 사회 문제를 겪고 있으며, 실업이 사회 문제를 일으키고 있다고 생각합니다."
+test_406,#Person1# 은 #Person2# 에게 가면무도회 파티에 어울리는 의상을 고르라고 제안합니다. #Person2# 는 #Person1# 에게 쇼핑을 제안합니다.
+test_407,"#Person1# 은 #Person2# 에게 춤추러 가자고 제안하고, #Person2# 는 디스코 댄스를 좋아합니다."
+test_408,"#Person1# 은 농장을 갖고 싶어 하고, #Person2# 는 농장 운영이 #Person1# 의 일과는 완전히 다르다고 생각합니다. #Person1# 은 농장에서 일하면서 휴가를 보내는 것을 제안합니다."
+test_409,"#Person2# 는 #Person1# 에게 하이네켄과 버드 반 파인트, 에피타이저를 주문합니다."
+test_410,Mary는 어젯밤 Ann과 갈등을 겪었습니다. Mary는 #Person1# 에게 Ann이 해변에 가기로 한 계획을 취소해야 한다고 알립니다.
+test_411,#Person2# 는 #Person1# 에게 담배와 기념품을 구매할 수 있다고 안내합니다.
+test_412,"Catherine은 #Person1# 에게 'Fast Food Nation'이 미국식 음식의 어두운 면을 보여주며, 미국의 패스트푸드 문화에 대해 설명합니다."
+test_413,"#Person1# 은 #Person2# 에게 버스가 워싱턴 스퀘어 공원으로 가는 것을 알려주고, #Person2# 는 버스가 워싱턴 스퀘어 공원에 도착하면 알려주겠다고 합니다."
+test_414,#Person1# 은 #Person2# 에게 9-11 테러 공격에 대해 묻습니다. #Person2# 는 #Person1# 에게 납치된 비행기가 쌍둥이 빌딩에 충돌하는 장면을 목격했다고 말합니다.
+test_415,"Karl과 Chuck Jones는 옆집으로 이사 왔습니다. Karl은 시카고 출신이고, Chuck은 미네소타 출신입니다."
+test_416,"#Person1# 은 #Person2# 에게 삶은 달걀과 토스트, 오렌지 주스를 주문합니다."
+test_417,Steven은 #Person1# 에게 오늘 밤 지하실 문을 닫으라고 요청합니다.
+test_418,#Person1# 은 Jane에게 다음 주 월요일 오후 3시쯤 만나기로 약속했습니다.
+test_419,"#Person2# 는 여자친구에게 줄 멋진 선물을 찾고 있습니다. #Person1# 은 #Person2# 에게 보라색 보석을 추천하고, #Person2# 는 그 보석을 마음에 들어 합니다. #Person1# 은 #Person2# 에게 약혼반지를 추천합니다."
+test_420,"#Person1# 은 Ford Pinto를 구매하고 싶어 하며, #Person2# 는 Ford Focus를 추천합니다. Ford Focus는 가볍고 강력한 엔진을 갖추고 있으며, #Person1# 은 Ford Focus를 추천합니다."
+test_421,"Ballam 씨는 애플 주식회사에서 컴퓨터 엔지니어 직책 제안을 받고 월 4,000 위안을 요구합니다."
+test_422,#Person2# 는 #Person1# 에게 네트워크 결제 서비스에 가입하면 모든 문제가 해결될 것이라고 설명합니다.
+test_423,#Person1# 은 배가 고파서 #Person2# 에게 땅콩버터와 잼 샌드위치를 만들어 먹으라고 제안합니다.
+test_424,#Person2# 는 #Person1# 에게 백혈구 수치를 확인하기 위해 혈액을 채취하라고 요청합니다.
+test_425,Steven은 Steven에게 전화를 걸어 전기가 나갔다고 알립니다. Steven은 #Person1# 에게 나간 퓨즈를 풀고 좋은 퓨즈로 교체하라고 조언합니다.
+test_426,Paula는 세 들어 사는 집의 집주인인 Ms. Connors에 관한 문제를 해결하기 위해 #Person1# 에게 도움을 요청합니다.
+test_427,"#Person1# 은 에어컨이 작동하지 않는다고 불평하고, #Person2# 는 Dan이 그 일을 맡고 있다고 설명합니다."
+test_428,"#Person1# 은 #Person2# 에게 해고당했다고 말하고, #Person2# 는 대출금을 내고 싶다고 합니다."
+test_429,#Person1# 은 #Person2# 에게 사장님과의 관계에 대해 묻습니다.
+test_430,#Person1# 은 Tang 씨에게 관광 가이드 자격증 사본과 외국어 능력을 묻습니다.
+test_431,#Person2# 는 #Person1# 의 도움으로 금 시계를 구매합니다.
+test_432,Tom은 Sara에게 자신의 딸 Maria가 열이 나서 저녁을 먹지 못한다고 알립니다. Sara는 Tom을 집으로 데려가기로 합니다.
+test_433,Amy는 대학 졸업 후 총지배인 비서로 일하다가 인사부장으로 승진했습니다.
+test_434,"Andrew는 #Person1# 에게 자신의 외모에 대해 이야기합니다. #Person1# 은 Andrew가 뚱뚱하다고 생각하지만, Andrew는 자신의 체중을 감량하고 싶다고 말합니다."
+test_435,"브라운 컬리지의 그렉 손더스 씨는 메리에게 대학 스포츠에 관심이 있는지 묻고, 메리는 대학 스포츠에 관심이 있다고 답변합니다."
+test_436,#Person1# 은 #Person2# 에게 기차역까지 약 20분 정도 소요된다고 말합니다.
+test_437,Brian은 #Person1# 에게 미국에서 3주 동안 영어를 배웠다고 말합니다.
+test_438,"#Person2# 는 새로운 건강 보험에 가입하기 위해 건강검진을 받으러 왔습니다. #Person1# 은 #Person2# 에게 호흡에 문제가 있다고 말하고, #Person2# 는 검사 항목에 대해 설명합니다."
+test_439,#Person1# 은 #Person2# 에게 복권에 당첨되면 아내와 아이들을 위해 정원이 있는 큰 집을 사겠다고 말합니다. #Person2# 는 #Person1# 에게 밍크 코트를 사달라고 요청합니다.
+test_440,#Person1# 은 #Person2# 에게 결혼할 준비가 안 됐다고 말합니다. #Person2# 는 #Person1# 에게 Amy를 결혼식장에 남겨두지 말라고 조언합니다.
+test_441,#Person1# 은 #Person2# 에게 예전 명함과 동일한 서류를 작성해 달라고 요청합니다.
+test_442,브라이언은 #Person1# 에게 공항에서 전무님을 만나러 오라고 초대합니다.
+test_443,"#Person1# 은 Paul을 추수감사절 저녁에 초대했지만, Paul은 부모님이 핀란드에 계신다고 한다. Paul은 #Person1# 에게 저녁 식사에 초대하고, #Person1# 은 이를 수락한다."
+test_444,존은 이번 주말에 수잔에게 대학 인터뷰가 있어서 수잔의 도움을 요청합니다. 수잔은 토요일 오전 11시에 수잔을 집으로 데려다주기로 했습니다.
+test_445,"Ben은 #Person1# 에게 사진 강좌가 너무 비싸다고 말합니다. #Person1# 은 #Person2# 에게 $280을 제안하지만, Ben은 거절합니다. #Person1# 은 저녁 파티를 제안합니다."
+test_446,#Person1# 과 #Person2# 는 저녁 식사를 위해 피자 익스피리언스로 가기로 결정합니다.
+test_447,"#Person1# 은 Gene에게 운전면허 시험에 대해 묻고, Gene은 #Person1# 에게 운전면허 시험에 대해 설명합니다."
+test_448,#Person1# 은 #Person2# 의 도움으로 펜을 구매합니다.
+test_449,#Person2# 는 #Person1# 에게 #Person1# 의 회사가 미국 암 학회를 위한 마라톤 후원 행사를 후원했다고 설명합니다. #Person1# 은 그 행사가 좋은 일이라고 생각합니다.
+test_450,#Person1# 은 #Person2# 에게 피크 트램까지 가는 길을 안내합니다.
+test_451,#Person1# 은 #Person2# 에게 백단향 부채를 추천합니다.
+test_452,#Person2# 는 #Person1# 에게 외부 요인과 내부 요인의 차이를 설명합니다.
+test_453,#Person1# 은 #Person2# 에게 오늘 오후 2시에 준비 회의를 시작하자고 제안합니다.
+test_454,#Person2# 는 #Person1# 에게 짧은 여행을 추천합니다.
+test_455,"#Person2# 는 비프버거, 프렌치프라이, 밀크셰이크를 주문합니다."
+test_456,"#Person1# 과 #Person2# 는 등불 축제에 대해 이야기합니다. #Person1# 은 등불에 적힌 수수께끼를 푸는 것이 전통이라고 설명합니다. #Person2# 는 #Person1# 에게 큰 용 등불을 보여주고, #Person1# 은 그 등불에 관심을 보입니다."
+test_457,"Tina는 면접 첫 두 라운드를 성공적으로 통과했고, 다음 주 월요일에 최종 라운드로 갈 예정이다. #Person1# 은 Tina에게 저녁에 축하하러 가자고 제안한다."
+test_458,팀과 카렌은 다시 돌아다니다가 만나기로 했다.
+test_459,"#Person1# 은 #Person2# 에게 부서 회의가 10시에 있다고 알려주고, #Person2# 는 사무실에서 일하는 것을 좋아한다고 말합니다."
+test_460,#Person1# 은 목욕을 위해 #Person2# 에게 설명서를 요청합니다.
+test_461,#Person2# 는 #Person1# 에게 기차에서 시간 때우기 좋은 책 추천을 요청합니다.
+test_462,"#Person1# 은 #Person2# 에게 친구에게 읽는 법을 가르치는 것을 제안하고, #Person2# 는 이에 동의합니다."
+test_463,#Person1# 은 #Person2# 의 티켓을 예약하고 800달러를 카드로 결제합니다.
+test_464,#Person2# 는 #Person1# 에게 오늘 저녁에 냉동 피자를 구워 먹자고 제안합니다. #Person1# 은 #Person2# 에게 건강한 요리 방법을 알려줍니다.
+test_465,#Person1# 은 #Person2# 에게 부스에 있는 두 전화기 사용법을 설명합니다.
+test_467,"톰은 중고 컴퓨터를 사고 싶어 하고, #Person1# 은 중고 물건에 대해 묻습니다."
+test_468,Morgan은 #Person1# 에게 중국에서는 남은 음식을 집에 가져가는 것이 흔한 일이라고 말합니다. Morgan은 #Person1# 에게 남은 음식을 집에 가져가는 것이 더 낫다고 조언합니다.
+test_469,해리는 #Person1# 에게 중국의 길거리 시장에서 쇼핑하지 않을 것이라고 말합니다. #Person1# 은 #Person2# 에게 흥정을 권하지만 #Person2# 는 흥정이 필수적이라고 설명합니다.
+test_470,#Person1# 은 #Person2# 에게 영어 말하기와 쓰기에 능숙하다고 말합니다.
+test_471,"#Person2# 는 #Person1# 에게 당좌예금과 저축예금을 동시에 개설하고 싶다고 말합니다. #Person1# 은 #Person2# 에게 계좌에 대해 문의하고, #Person2# 는 계좌에 대해 1% 이자를 요구합니다."
+test_472,"#Person1# 은 #Person2# 에게 특별 할인 쿠폰을 요청하고, #Person2# 는 쿠폰을 사용하면 10펜스 할인을 받을 수 있다고 안내합니다."
+test_473,Mrs. Robinson은 Steve에게 Johnny를 돌봐줘서 고맙다고 말합니다.
+test_474,#Person2# 는 #Person1# 의 도움으로 상하이로 가는 기차표를 구매합니다.
+test_475,Ann은 #Person1# 에게 '웰빙 인 더 에어' 프로그램을 추천합니다. Ann은 #Person1# 에게 '웰빙 인 더 에어' 프로그램을 추천합니다.
+test_476,"Tom은 Mary에게 오늘 밤 John의 파티에 가자고 제안하지만, Mary는 일자리를 찾지 못해 다른 일을 찾기로 했다."
+test_477,해리는 길을 건너다 차에 치일 뻔한 끔찍한 경험을 #Person1# 에게 이야기한다.
+test_478,Steven Kayne 씨는 새로 자전거 가게를 인수한 Steven Kayne 씨를 인터뷰합니다. Steven Kayne 씨는 자신이 경주용 자전거를 좋아하고 자전거 고치는 것을 좋아했다고 말합니다. 그는 은행에서 사업 대출을 받게 되어 사장이 되고 싶다고 합니다.
+test_479,#Person1# 과 #Person2# 는 중년의 가장자리에 있는 사람들에 대해 이야기하고 있습니다.
+test_480,"#Person2# 는 #Person1# 에게 애플 크리스프, 초콜릿 무스 케이크, 애플 크리스프, 커피 네 잔을 주문합니다."
+test_481,"#Person1# 은 #Person2# 에게 아래층 침대를 요청하고, #Person2# 는 동전을 던지기로 결정합니다. #Person1# 은 #Person2# 에게 창가 책상을 가져가라고 제안합니다."
+test_482,Mr. Murray는 #Person1# 에게 도서관 카드를 발급받습니다.
+test_483,"#Person2# 는 보통 9시부터 5시까지 일하며, 초과 근무 수당 없이 보너스를 받습니다. #Person1# 은 #Person2# 에게 근무 시간에 대해 묻습니다."
+test_484,#Person1# 은 #Person2# 에게 기계에 비누를 넣는 방법을 묻습니다. #Person2# 는 #Person1# 에게 기계에 비누를 넣으라고 조언합니다. #Person1# 은 열아홉 살 때부터 기계를 사용했다고 말합니다.
+test_485,#Person1# 은 #Person2# 에게 오늘 밤 전화해달라고 부탁합니다.
+test_486,Katie는 #Person1# 에게 자신의 평가서를 보여줍니다. #Person1# 은 Katie에게 항상 일할 준비가 되어 있다고 말합니다.
+test_487,#Person1# 과 #Person2# 는 다음 주 토요일에 할아버지 생일 파티를 계획하고 있습니다.
+test_488,Gia Donatelli는 Gian Luca Donatelli에게 자신의 소개를 부탁합니다.
+test_489,Kathy는 #Person1# 에게 노스캐롤라이나 산은 조용하지만 17년 주기의 새울음이라고 설명합니다.
+test_490,#Person2# 는 #Person1# 의 도움으로 칠면조 샌드위치를 주문합니다.
+test_491,"James는 #Person1# 에게 David에게 빌려준 재킷을 입고 시골에 가서 사진을 찍고 싶다고 말합니다. #Person1# 은 카메라로 사진을 찍고 싶어 하고, James는 쿠키를 가져가기로 합니다."
+test_492,"#Person1# 은 테드에게 올해 어디로 휴가를 갈지 묻고, 테드는 아내와 함께 중국 여행을 계획 중이라고 답합니다."
+test_493,"#Person1# 은 #Person2# 에게 오늘 오후에 영화관에 가자고 초대하고, #Person2# 는 이에 동의합니다."
+test_494,#Person1# 은 #Person2# 에게 어젯밤 집에 도둑이 들었다고 말합니다.
+test_495,"Jack은 Charlie에게 비디오 게임을 제안하고, Charlie는 숙제를 먼저 끝내면 된다고 설명한다."
+test_496,#Person2# 는 #Person1# 에게 시골 음악에 관심을 가지게 된 계기와 시골 노래 책의 출판을 설명합니다.
+test_497,"#Person1# 은 Alice에게 세탁기 사용 방법을 묻고, Alice는 비누를 따로 넣을 필요가 없다고 설명합니다. Alice는 세탁기를 사용하면 비누를 제거할 수 없다고 말합니다."
+test_498,Matthew와 Steve는 1년 만에 다시 만나 서로의 이웃에 대해 이야기한다.
+test_499,Betsy는 Frank에게 파티에 초대한다. Frank는 파티에 초대한다.

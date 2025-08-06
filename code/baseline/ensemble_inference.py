@@ -1580,7 +1580,7 @@ class PostProcessingEnsemble:
             config,
             temperature=1.0,
             top_k=0,
-            top_p=0.9,  # Nucleus Sampling - 최적 성능 파라미터
+            top_p=1.0,  # Nucleus Sampling 비활성화 - test_293 NaN 문제 해결
             repetition_penalty=1.0
         )
     
@@ -1610,8 +1610,13 @@ class PostProcessingEnsemble:
         
         log.info(f"최적화된 Logit 앙상블 시작: top_p={top_p}, num_beams={num_beams}")
         
-        for text in tqdm(input_texts, desc="최적화된 Logit 앙상블 처리 중"):
+        for idx, text in enumerate(tqdm(input_texts, desc="최적화된 Logit 앙상블 처리 중")):
             try:
+                # 디버깅: 현재 처리 중인 샘플 로그  
+                log.info(f"🔍 [DEBUG] 샘플 {idx} 처리 시작")
+                log.info(f"🔍 [DEBUG] 입력 텍스트 길이: {len(text)}")
+                log.info(f"🔍 [DEBUG] 입력 텍스트 앞 100자: {text[:100]}")
+                
                 # 입력 토큰화
                 inputs = tokenizer(
                     text,
@@ -1621,15 +1626,24 @@ class PostProcessingEnsemble:
                     padding=True
                 ).to(self.device)
                 
-                # 각 모델의 encoder 출력 미리 계산
+                log.info(f"🔍 [DEBUG] 샘플 {idx} 토큰화 성공: input_ids shape={inputs['input_ids'].shape}")
+                
+                # 각 모델의 encoder 출력 미리 계산 (깊은 복사로 독립성 보장)
                 encoder_outputs_list = []
-                for model in self.models:
+                for model_idx, model in enumerate(self.models):
                     with torch.no_grad():
                         encoder_outputs = model.get_encoder()(
                             input_ids=inputs['input_ids'],
                             attention_mask=inputs['attention_mask']
                         )
-                        encoder_outputs_list.append(encoder_outputs.last_hidden_state)
+                        # 깊은 복사로 독립성 보장
+                        encoder_outputs_copy = encoder_outputs.last_hidden_state.clone().detach()
+                        encoder_outputs_list.append(encoder_outputs_copy)
+                        
+                        log.info(f"🔍 [DEBUG] 샘플 {idx} 모델 {model_idx+1} encoder 출력 shape: {encoder_outputs_copy.shape}")
+                        
+                        # 메모리 정리
+                        del encoder_outputs
                 
                 # Beam Search 초기화
                 decoder_start_token_id = tokenizer.bos_token_id
@@ -1647,14 +1661,22 @@ class PostProcessingEnsemble:
                 finished_sequences = []
                 
                 # Beam Search 루프 (Nucleus Sampling 적용)
+                log.info(f"🔍 [DEBUG] 샘플 {idx} Beam Search 시작 - max_length: {max_length}, num_beams: {num_beams}")
+                log.info(f"🔍 [DEBUG] 샘플 {idx} decoder_start_token_id: {decoder_start_token_id}, eos_token_id: {eos_token_id}")
+                
                 for step in range(max_length - 1):
+                    if step % 10 == 0 or step < 5:  # 처음 5단계와 10단계마다 로깅
+                        log.info(f"🔍 [DEBUG] 샘플 {idx} step {step}: finished_sequences={len(finished_sequences)}, beam_size={beam_size}")
+                    
                     if len(finished_sequences) >= beam_size:
+                        log.info(f"🔍 [DEBUG] 샘플 {idx} step {step}: 충분한 finished_sequences로 조기 종료")
                         break
                     
                     current_sequences = sequences[beam_scores > -float('inf')]
                     current_scores = beam_scores[beam_scores > -float('inf')]
                     
                     if len(current_sequences) == 0:
+                        log.info(f"🔍 [DEBUG] 샘플 {idx} step {step}: current_sequences가 비어서 종료")
                         break
                     
                     # 각 모델에서 logits 계산
@@ -1688,7 +1710,26 @@ class PostProcessingEnsemble:
                             sorted_indices_to_remove[0] = 0
                             
                             indices_to_remove = sorted_indices[sorted_indices_to_remove]
+                            
+                            # 디버깅: nucleus sampling 상태 로깅
+                            if step < 5:  # 처음 5 스텝만 로깅
+                                log.info(f"🔍 [NUCLEUS] 샘플 {idx} step {step} beam {beam_idx}")
+                                log.info(f"🔍 [NUCLEUS] 원본 logits 범위: [{ensemble_logits[beam_idx].min():.3f}, {ensemble_logits[beam_idx].max():.3f}]")
+                                log.info(f"🔍 [NUCLEUS] top 5 logits: {sorted_logits[:5].tolist()}")
+                                log.info(f"🔍 [NUCLEUS] top 5 probs: {sorted_probs[:5].tolist()}")
+                                log.info(f"🔍 [NUCLEUS] cumulative_probs[:10]: {cumulative_probs[:10].tolist()}")
+                                log.info(f"🔍 [NUCLEUS] 제거할 토큰 수: {len(indices_to_remove)}")
+                                log.info(f"🔍 [NUCLEUS] 남은 토큰 수: {(ensemble_logits[beam_idx] > -float('inf')).sum().item()}")
+                            
                             ensemble_logits[beam_idx, indices_to_remove] = -float('inf')
+                            
+                            # 추가 체크: 모든 토큰이 제거되었는지 확인
+                            valid_tokens = (ensemble_logits[beam_idx] > -float('inf')).sum().item()
+                            if valid_tokens == 0:
+                                log.error(f"🚨 [NUCLEUS] 샘플 {idx} step {step} beam {beam_idx}: 모든 토큰이 제거됨!")
+                                # 응급처치: 최고 확률 토큰 하나는 유지
+                                best_token_idx = torch.argmax(sorted_logits)
+                                ensemble_logits[beam_idx, sorted_indices[best_token_idx]] = sorted_logits[best_token_idx]
                     
                     # Log probabilities 계산
                     next_token_log_probs = torch.log_softmax(ensemble_logits, dim=-1)
@@ -1705,9 +1746,9 @@ class PostProcessingEnsemble:
                     new_sequences = []
                     new_scores = []
                     
-                    for score, idx in zip(top_scores, top_indices):
-                        beam_idx = idx // vocab_size
-                        token_id = idx % vocab_size
+                    for score, token_idx in zip(top_scores, top_indices):
+                        beam_idx = token_idx // vocab_size
+                        token_id = token_idx % vocab_size
                         
                         new_seq = torch.cat([
                             current_sequences[beam_idx],
@@ -1736,26 +1777,72 @@ class PostProcessingEnsemble:
                         sequences[i, :len(seq)] = seq
                         beam_scores[i] = score
                 
+                # Beam Search 완료 후 로깅
+                log.info(f"🔍 [DEBUG] 샘플 {idx} Beam Search 완료 - finished_sequences: {len(finished_sequences)}")
+                log.info(f"🔍 [DEBUG] 샘플 {idx} beam_scores 유효 개수: {torch.sum(beam_scores > -float('inf')).item()}")
+                
                 # 최고 점수 시퀀스 선택
                 if finished_sequences:
+                    log.info(f"🔍 [DEBUG] 샘플 {idx} finished_sequences 선택 시작: {len(finished_sequences)}개 후보")
+                    for i, (seq, score) in enumerate(finished_sequences[:3]):  # 상위 3개만 로그
+                        seq_preview = seq.tolist()[:15] if len(seq) > 15 else seq.tolist()
+                        log.info(f"🔍 [DEBUG] 샘플 {idx} finished_seq[{i}]: {seq_preview} (score: {score})")
+                    
                     best_sequence, best_score = max(finished_sequences, key=lambda x: x[1])
+                    
+                    log.info(f"🔍 [DEBUG] 샘플 {idx} 선택된 best_score: {best_score}")
+                    log.info(f"🔍 [DEBUG] 샘플 {idx} 선택된 best_sequence: {best_sequence.tolist()}")
                 else:
+                    log.info(f"🔍 [DEBUG] 샘플 {idx} finished_sequences가 비어서 beam_scores에서 선택")
+                    log.info(f"🔍 [DEBUG] 샘플 {idx} beam_scores: {beam_scores.tolist()}")
+                    log.info(f"🔍 [DEBUG] 샘플 {idx} sequences shape: {sequences.shape}")
+                    
                     best_idx = torch.argmax(beam_scores)
                     best_sequence = sequences[best_idx]
+                    
+                    log.info(f"🔍 [DEBUG] 샘플 {idx} 선택된 best_idx: {best_idx}")
+                    log.info(f"🔍 [DEBUG] 샘플 {idx} 선택된 best_sequence: {best_sequence.tolist()}")
+                
+                log.info(f"🔍 [DEBUG] 샘플 {idx} best_sequence shape: {best_sequence.shape}")
+                log.info(f"🔍 [DEBUG] 샘플 {idx} best_sequence 실제 내용: {best_sequence}")
+                log.info(f"🔍 [DEBUG] 샘플 {idx} best_sequence가 비어있는가? {len(best_sequence) == 0}")
+                
+                # CRITICAL: best_sequence가 비어있거나 문제가 있는 경우 fallback 처리
+                if len(best_sequence) == 0 or best_sequence.dim() == 0:
+                    log.error(f"🚨 [CRITICAL] 샘플 {idx} best_sequence가 비어있음! fallback 처리")
+                    results.append("")
+                    continue
                 
                 # 텍스트로 디코딩 (baseline.py와 동일하게 특수 토큰 유지)
                 generated_text = tokenizer.decode(best_sequence, skip_special_tokens=False)
                 
+                log.info(f"🔍 [DEBUG] 샘플 {idx} 디코딩 결과: '{generated_text}'")
+                log.info(f"🔍 [DEBUG] 샘플 {idx} best_sequence 내용: {best_sequence.tolist()}")
+                log.info(f"🔍 [DEBUG] 샘플 {idx} best_sequence 길이: {len(best_sequence)}")
+                
                 # 불필요한 토큰 제거
+                original_text = generated_text
                 for token in config['inference']['remove_tokens']:
                     generated_text = generated_text.replace(token, " ")
+                
+                log.info(f"🔍 [DEBUG] 샘플 {idx} 토큰 제거 전: '{original_text}'")
+                log.info(f"🔍 [DEBUG] 샘플 {idx} 토큰 제거 후: '{generated_text}'")
+                log.info(f"🔍 [DEBUG] 샘플 {idx} 최종 결과: '{generated_text.strip()}'")
                 
                 results.append(generated_text.strip())
                 
             except Exception as e:
-                log.warning(f"최적화된 Logit 앙상블 오류: {e}")
+                # 예외 발생 시 상세 로그
+                log.error(f"🚨 [ERROR] 샘플 {idx} 처리 중 예외 발생!")
+                log.error(f"🚨 [ERROR] 예외 유형: {type(e).__name__}")
+                log.error(f"🚨 [ERROR] 예외 메시지: {str(e)}")
+                import traceback
+                log.error(f"🚨 [ERROR] 상세 스택 트레이스:\n{traceback.format_exc()}")
+                
+                log.warning(f"최적화된 Logit 앙상블 오류 (샘플 {idx}): {e}")
                 # Fallback: 첫 번째 모델의 beam search 결과 사용
                 try:
+                    log.info(f"🔄 [FALLBACK] 샘플 {idx} fallback 시도: 첫 번째 모델 단독 생성")
                     with torch.no_grad():
                         output_ids = self.models[0].generate(
                             input_ids=inputs['input_ids'],
@@ -1768,8 +1855,12 @@ class PostProcessingEnsemble:
                     fallback_text = tokenizer.decode(output_ids[0], skip_special_tokens=False)
                     for token in config['inference']['remove_tokens']:
                         fallback_text = fallback_text.replace(token, " ")
+                    
+                    log.info(f"🔄 [FALLBACK] 샘플 {idx} fallback 성공: '{fallback_text.strip()}'")
                     results.append(fallback_text.strip())
-                except:
+                except Exception as fallback_e:
+                    log.error(f"🚨 [FALLBACK ERROR] 샘플 {idx} fallback도 실패: {fallback_e}")
+                    log.error(f"🚨 [FALLBACK ERROR] 빈 문자열로 대체")
                     results.append("")  # 빈 문자열로 fallback
         
         log.info("최적화된 Logit 앙상블 완료")
