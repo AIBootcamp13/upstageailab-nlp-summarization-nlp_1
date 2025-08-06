@@ -1,0 +1,42 @@
+# WandB Sweep Configuration for Solar API Hyperparameter Tuning
+method: bayes  # 베이지안 최적화로 효율적인 탐색
+metric:
+  name: eval/rouge_avg    # ROUGE 평균 점수
+  goal: maximize          # ROUGE 점수이므로 최대화
+
+parameters:
+  # Few-shot 샘플 개수 (1~5개)
+  "few_shot_count":
+    values: [1, 2, 3, 4, 5]
+    
+  # Solar API 모델 선택
+  "model":
+    values: ["solar-pro2", "solar-pro", "solar-mini", "solar-pro-nightly", "solar-mini-nightly", "solar-1-mini-chat"]
+    
+  # Temperature 파라미터 (창의성 조절)
+  "temperature":
+    min: 0.1
+    max: 0.5
+    distribution: uniform
+    
+  # Top-p 파라미터 (토큰 선택 범위)
+  "top_p":
+    min: 0.1
+    max: 0.9
+    distribution: uniform
+
+# 고정 파라미터 (최적화 대상 아님)
+# - validation_samples: 100 (코드에서 하드코딩)
+# - 데이터셋 경로 및 기본 설정들
+
+# Note: 
+# - validation_samples는 100으로 고정 (sweep 대상 아님)
+# - 모든 실험에서 동일한 random_state=42 사용으로 재현성 보장
+# - Rate limiting을 고려한 API 호출 최적화 포함
+
+# Command to run
+command:
+  - ${env}
+  - python
+  - solar_api_sweep.py
+  - ${args}
