@@ -1,59 +1,80 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
+#!/usr/bin/env python3
 """
-Ensemble Inference System for Multiple Strategies
-WandB sweep으로 생성된 여러 모델들을 다양한 앙상블 방식으로 추론하는 시스템
+🔬 대화 요약 앙상블 추론 시스템 (간소화된 함수 기반 버전)
 
-지원하는 앙상블 방식:
-1. 하드 보팅 (Hard Voting): 토큰별 다수결
-2. 소프트 보팅 (Soft Voting): 확률 분포 평균  
-3. 길이 기반 (Length-based): 가장 긴 결과 선택
-4. 실시간 토큰 앙상블 (Realtime Token Ensemble): 매 토큰마다 확률 분포 평균
-5. Logit 레벨 앙상블 (Logit Level Ensemble): 최적화된 Nucleus Sampling + Beam Search
+5가지 앙상블 기법을 단순한 함수로 구현하고, 
+각 기법 완료 시 즉시 ROUGE 점수를 출력합니다.
+
+앙상블 방식:
+1. hard_voting   - 각 모델이 완전한 텍스트 생성 후 토큰별 다수결
+2. soft_voting   - 각 모델의 확률 분포를 평균하여 최적 후보 선택
+3. length_based  - 각 모델 결과 중 가장 긴 것을 선택
+4. logit_level   - 최적화된 Logit 앙상블 (Nucleus Sampling + Beam Search)
+5. realtime_token- 매 토큰마다 모든 모델의 확률 분포를 평균하여 생성
 
 사용법:
-- python ensemble_inference.py --mode=all           # 모든 방식 비교
-- python ensemble_inference.py --mode=hard_voting   # 하드 보팅만
-- python ensemble_inference.py --mode=soft_voting   # 소프트 보팅만
-- python ensemble_inference.py --mode=length_based  # 길이 기반만
-- python ensemble_inference.py --mode=realtime_token # 실시간 토큰 앙상블만
-- python ensemble_inference.py --mode=logit_level    # 최적화된 Logit 앙상블만
+- python ensemble_inference_simple.py --mode=all           # 모든 방식 비교
+- python ensemble_inference_simple.py --mode=hard_voting   # 하드 보팅만
+- python ensemble_inference_simple.py --mode=soft_voting   # 소프트 보팅만
+- python ensemble_inference_simple.py --mode=length_based  # 길이 기반만
+- python ensemble_inference_simple.py --mode=realtime_token # 실시간 토큰 앙상블만
+- python ensemble_inference_simple.py --mode=logit_level    # 최적화된 Logit 앙상블만
 """
 
 # 스크립트 파일이 있는 디렉토리를 현재 작업 디렉토리로 설정
 import os; os.chdir(os.path.dirname(os.path.abspath(__file__)))
 import sys; sys.path.append('../utils')
 import log_util as log
+from baseline import compute_metrics
 
-import pandas as pd
+# 검증 데이터 개수 제한 (None이면 전체 데이터 사용)
+DEV_DATA_LIMIT = None #50  # 0이나 None이 아닌 정수를 설정하면 해당 개수만큼만 사용
+
+# 테스트 데이터 개수 제한 (None이면 전체 데이터 사용)
+TEST_DATA_LIMIT = None #50  # 0이나 None이 아닌 정수를 설정하면 해당 개수만큼만 사용
+
+import argparse
 import json
-import yaml
-import torch
-import zipfile
-import shutil
 import time
-from datetime import datetime
+import zipfile
 from collections import Counter
-from tqdm import tqdm
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, List, Tuple, Optional, Any
 import random
+
 import numpy as np
-
-from transformers import AutoTokenizer, BartForConditionalGeneration, BartConfig
-
+import pandas as pd
+import torch
+import torch.nn.functional as F
+from tqdm import tqdm
+from transformers import AutoTokenizer, BartForConditionalGeneration
+from rouge import Rouge
 # baseline.py에서 필요한 클래스들 임포트
 from baseline import Preprocess, DatasetForVal, compute_metrics
 from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments
 import tempfile
 
-def get_model_paths():
-    """
-    모델 경로들을 반환하는 공통 함수
-    
-    Returns:
-        list: 존재하는 모델 파일 경로들
-    """
-    # TODO: 실제 저장된 모델 경로로 수정 필요
+# 시드 설정
+def set_seed(seed: int = 42):
+    """재현 가능한 결과를 위한 시드 설정"""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+    # CUDNN 재현성 설정 (ensemble_inference_best.py와 동일)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+# =============================================================================
+# 공통 유틸리티 함수들
+# =============================================================================
+
+def get_model_paths() -> List[str]:
+    """ensemble_inference.py에서 사용했던 정확히 동일한 3개 모델 사용"""
+    # ensemble_inference.py에서 지정했던 정확한 모델들
     model_paths = [
         "./models/model_baseline_20250805_070447.zip",  
         "./models/model_baseline_20250805_060913.zip",
@@ -62,195 +83,373 @@ def get_model_paths():
     
     # 존재하는 모델 파일만 필터링
     existing_model_paths = []
-    for path in model_paths:
-        if os.path.exists(path):
-            existing_model_paths.append(path)
-            log.info(f"모델 파일 확인: {path}")
+    for model_path in model_paths:
+        if os.path.exists(model_path):
+            existing_model_paths.append(model_path)
+            log.info(f"모델 파일 확인: {model_path}")
         else:
-            log.warning(f"모델 파일 없음 (건너뜀): {path}")
+            log.warning(f"모델 파일 없음: {model_path}")
     
     if not existing_model_paths:
-        log.error("사용 가능한 모델 파일이 없습니다!")
-        log.info("먼저 WandB sweep을 실행하여 모델을 학습시키세요:")
-        log.info("python wandb_sweep.py --count 3")
+        log.error("지정된 모델 파일들이 없습니다.")
         return []
     
-    log.info(f"총 {len(existing_model_paths)}개 모델 파일 확인됨")
+    log.info(f"총 {len(existing_model_paths)}개 모델로 앙상블 진행")
     return existing_model_paths
 
-def load_model_package(zip_path):
+def load_models(model_paths: List[str], device: str) -> Tuple[List, List, List, List]:
     """
-    ZIP 파일에서 모델, 토크나이저, 설정을 로딩
+    모델들을 로드하고 반환 (원래 ensemble_inference.py의 로직 사용)
     
-    Args:
-        zip_path: ZIP 파일 경로
-        
     Returns:
-        tuple: (model, tokenizer, config, metadata)
+        Tuple[models, tokenizers, configs, metadata_list]
     """
-    temp_dir = f"temp_load_{int(time.time())}"
+    import yaml
+    import shutil
     
-    try:
-        log.info(f"모델 패키지 로딩 시작: {zip_path}")
+    models = []
+    tokenizers = []
+    configs = []
+    metadata_list = []
+    
+    log.info(f"앙상블 시스템 초기화: {len(model_paths)}개 모델")
+    log.info(f"사용 디바이스: {device}")
+    log.info("모델들 로딩 시작...")
+    
+    for i, model_path in enumerate(model_paths):
+        log.info(f"모델 {i+1}/{len(model_paths)} 로딩 중: {model_path}")
         
-        # ZIP 압축 해제
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(temp_dir)
+        temp_dir = f"temp_load_{int(time.time())}"
         
-        # 설정 로드
-        config_path = os.path.join(temp_dir, "config.yaml")
-        with open(config_path, "r", encoding='utf-8') as f:
-            config = yaml.safe_load(f)
-        log.info("설정 파일 로드 완료")
-            
-        # 메타데이터 로드
-        metadata_path = os.path.join(temp_dir, "metadata.json")
-        with open(metadata_path, "r", encoding='utf-8') as f:
-            metadata = json.load(f)
-        log.info("메타데이터 로드 완료")
-        
-        # 시드 설정 (재현성 보장)
-        if 'training' in config and 'seed' in config['training']:
-            seed = config['training']['seed']
-            torch.manual_seed(seed)
-            torch.cuda.manual_seed(seed)
-            torch.cuda.manual_seed_all(seed)
-            np.random.seed(seed)
-            random.seed(seed)
-            torch.backends.cudnn.deterministic = True
-            torch.backends.cudnn.benchmark = False
-            log.info(f"모델 로딩 시 시드 설정: {seed}")
-        
-        # 토크나이저 로드 먼저 (실제 vocab 크기 확인용)
-        tokenizer_dir = os.path.join(temp_dir, "tokenizer")
-        tokenizer = AutoTokenizer.from_pretrained(tokenizer_dir)
-        
-        # Special tokens 추가 (baseline.py와 동일한 방식)
-        if 'tokenizer' in config and 'special_tokens' in config['tokenizer']:
-            special_tokens_dict = {'additional_special_tokens': config['tokenizer']['special_tokens']}
-            tokenizer.add_special_tokens(special_tokens_dict)
-            log.info(f"Special tokens 추가: {config['tokenizer']['special_tokens']}")
-        
-        log.info("토크나이저 로드 완료")
-        
-        # 저장된 모델의 config.json 직접 로드 및 수정
         try:
-            # 저장된 config.json 파일 읽기
-            config_path = os.path.join(temp_dir, "config.json")
-            if os.path.exists(config_path):
-                with open(config_path, "r", encoding='utf-8') as f:
-                    model_config_dict = json.load(f)
+            # 모델 패키지 로딩
+            log.info(f"모델 패키지 로딩 시작: {model_path}")
+            with zipfile.ZipFile(model_path, 'r') as zip_ref:
+                zip_ref.extractall(temp_dir)
+            
+            # 설정 로드
+            config_path = os.path.join(temp_dir, "config.yaml")
+            with open(config_path, "r", encoding='utf-8') as f:
+                config = yaml.safe_load(f)
+            log.info("설정 파일 로드 완료")
                 
-                # 분류 관련 설정 제거
-                model_config_dict.pop('num_labels', None)
-                model_config_dict.pop('id2label', None)
-                model_config_dict.pop('label2id', None)
-                
-                # 수정된 config로 BartConfig 생성
-                bart_config = BartConfig(**model_config_dict)
-                log.info(f"BART 설정 로드 완료 (config.json 사용), vocab_size: {bart_config.vocab_size}")
-            else:
-                # config.json이 없으면 기본 방식 사용
-                model_name = config['general']['model_name']
-                bart_config = BartConfig.from_pretrained(model_name)
-                actual_vocab_size = len(tokenizer)
-                bart_config.vocab_size = actual_vocab_size
-                log.info(f"BART 설정 로드 완료 (기본 방식), vocab_size: {actual_vocab_size}")
-        except Exception as e:
-            log.warning(f"config.json 처리 중 오류, 기본 방식 사용: {e}")
-            model_name = config['general']['model_name']
+            # 메타데이터 로드
+            metadata_path = os.path.join(temp_dir, "metadata.json")
+            with open(metadata_path, "r", encoding='utf-8') as f:
+                metadata = json.load(f)
+            log.info("메타데이터 로드 완료")
+            
+            # 시드 설정 (config에서 - ensemble_inference_best.py와 동일)
+            if 'training' in config and 'seed' in config['training']:
+                seed = config['training']['seed']
+                set_seed(seed)
+                log.info(f"모델 로딩 시 시드 설정: {seed}")
+            
+            # 토크나이저 로드 먼저 (실제 vocab 크기 확인용)
+            tokenizer_dir = os.path.join(temp_dir, "tokenizer")
+            tokenizer = AutoTokenizer.from_pretrained(tokenizer_dir)
+            
+            # Special tokens 추가 (baseline.py와 동일한 방식)
+            if 'tokenizer' in config and 'special_tokens' in config['tokenizer']:
+                special_tokens_dict = {'additional_special_tokens': config['tokenizer']['special_tokens']}
+                tokenizer.add_special_tokens(special_tokens_dict)
+                log.info(f"Special tokens 추가: {config['tokenizer']['special_tokens']}")
+            
+            log.info("토크나이저 로드 완료")
+            
+            # 모델 로드 (temp_dir 루트에 모델 파일들이 있음)
+            from transformers import BartConfig
+            
+            # 저장된 모델의 config.json 직접 로드 및 수정
+            model_name = metadata.get('model_info', {}).get('model_name', 'digit82/kobart-summarization')
             bart_config = BartConfig.from_pretrained(model_name)
             actual_vocab_size = len(tokenizer)
             bart_config.vocab_size = actual_vocab_size
-        
-        # 모델 로드 (config의 vocab_size가 조정된 상태)
-        model = BartForConditionalGeneration.from_pretrained(temp_dir, config=bart_config)
-        
-        # 토큰 임베딩 크기 조정 (필수! wandb_sweep.py와 동일하게 처리)
-        # special tokens가 추가된 경우 반드시 필요
-        model.resize_token_embeddings(len(tokenizer))
-        model.eval()  # evaluation 모드 설정
-        log.info("모델 로드 완료")
-        
-        return model, tokenizer, config, metadata
-        
-    except Exception as e:
-        log.error(f"모델 패키지 로딩 중 오류: {e}")
-        log.error(f"오류 세부 정보: {type(e).__name__}")
-        if "num_labels" in str(e) and "id2label" in str(e):
-            log.error("히트: BART 모델 설정 불일치 문제입니다. 모델을 다시 학습하거나 config 설정을 확인하세요.")
-        raise
-        
-    finally:
-        # 임시 폴더 삭제
-        if os.path.exists(temp_dir):
-            shutil.rmtree(temp_dir, ignore_errors=True)
+            
+            model = BartForConditionalGeneration.from_pretrained(temp_dir, config=bart_config)
+            
+            # 토크나이저와 모델 vocab 크기 맞추기
+            model.resize_token_embeddings(len(tokenizer))
+            model.to(device)
+            model.eval()
+            
+            log.info(f"BART 설정 로드 완료, vocab_size: {len(tokenizer)}")
+            log.info("모델 로드 완료")
+            
+            models.append(model)
+            tokenizers.append(tokenizer)
+            configs.append(config)
+            metadata_list.append(metadata)
+            
+            # 임시 파일 정리
+            shutil.rmtree(temp_dir)
+            
+            log.info(f"모델 {i+1} 로딩 완료: {metadata.get('wandb_run_name', 'unknown')} (device: {device})")
+            
+        except Exception as e:
+            log.error(f"모델 {i+1} 로딩 실패: {e}")
+            # 임시 파일 정리
+            try:
+                shutil.rmtree(temp_dir)
+            except:
+                pass
+            continue
+    
+    log.info(f"총 {len(models)}개 모델 로딩 완료")
+    return models, tokenizers, configs, metadata_list
 
-def evaluate_ensemble_results_with_baseline(predictions, references, config, tokenizer):
+def calculate_rouge_scores(predictions: List[str], references: List[str], method_name: str, remove_tokens: List[str]) -> Dict[str, float]:
     """
-    앙상블 결과를 baseline.py와 동일한 방식으로 평가
+    ROUGE 점수를 계산하고 즉시 출력
     
     Args:
-        predictions: 앙상블 예측 결과 리스트
-        references: 참조 요약 리스트
-        config: 설정
-        tokenizer: 토크나이저
+        predictions: 예측 결과 리스트
+        references: 참조 답안 리스트  
+        method_name: 앙상블 방법 이름
+        remove_tokens: 제거할 토큰들
         
     Returns:
-        dict: ROUGE 메트릭 결과
+        ROUGE 점수 딕셔너리
     """
-    log.info("앙상블 결과를 baseline.py 방식으로 평가 시작")
+    rouge = Rouge()
     
-    # compute_metrics 함수 직접 사용 (baseline.py와 동일)
-    # 예측 결과를 토크나이징하여 compute_metrics가 기대하는 형태로 변환
-    pred_tokens = []
-    label_tokens = []
+    # 토큰 제거 및 정규화
+    cleaned_predictions = []
+    cleaned_references = []
     
     for pred, ref in zip(predictions, references):
-        # 예측 결과 토크나이징
-        pred_encoded = tokenizer.encode(pred, return_tensors="pt", truncation=True, max_length=512)
-        pred_tokens.append(pred_encoded.squeeze().tolist())
+        # 불필요한 토큰 제거
+        pred_clean = pred
+        ref_clean = ref
+        for token in remove_tokens:
+            pred_clean = pred_clean.replace(token, " ")
+            ref_clean = ref_clean.replace(token, " ")
         
-        # 참조 결과 토크나이징
-        ref_encoded = tokenizer.encode(ref, return_tensors="pt", truncation=True, max_length=512)
-        label_tokens.append(ref_encoded.squeeze().tolist())
+        # 공백 정리
+        pred_clean = " ".join(pred_clean.split()).strip()
+        ref_clean = " ".join(ref_clean.split()).strip()
+        
+        # 빈 문자열 처리
+        if not pred_clean.strip():
+            pred_clean = "empty"
+        if not ref_clean.strip():
+            ref_clean = "empty"
+            
+        cleaned_predictions.append(pred_clean)
+        cleaned_references.append(ref_clean)
     
-    # compute_metrics가 기대하는 형태로 데이터 구성
-    from collections import namedtuple
-    import numpy as np
+    # ROUGE 계산
+    try:
+        rouge_results = rouge.get_scores(cleaned_predictions, cleaned_references, avg=True)
+        rouge_scores = {key: value["f"] for key, value in rouge_results.items()}
+        rouge_scores['rouge-avg'] = (rouge_scores['rouge-1'] + rouge_scores['rouge-2'] + rouge_scores['rouge-l']) / 3
+        
+        # 즉시 결과 출력
+        log.info(f"")
+        log.info(f"🎯 {method_name} 완료!")
+        log.info(f"📊 ROUGE 점수:")
+        log.info(f"   - ROUGE-1: {rouge_scores['rouge-1']:.6f}")
+        log.info(f"   - ROUGE-2: {rouge_scores['rouge-2']:.6f}")  
+        log.info(f"   - ROUGE-L: {rouge_scores['rouge-l']:.6f}")
+        log.info(f"   - ROUGE-avg: {rouge_scores['rouge-avg']:.6f}")
+        log.info(f"")
+        
+        return rouge_scores
+        
+    except Exception as e:
+        log.error(f"ROUGE 계산 실패 ({method_name}): {e}")
+        return {'rouge-1': 0.0, 'rouge-2': 0.0, 'rouge-l': 0.0, 'rouge-avg': 0.0}
+
+def save_results_to_json(results: Dict[str, Any], timestamp: str) -> str:
+    """결과를 JSON 파일로 저장"""
+    results_dir = "./ensemble_results"
+    os.makedirs(results_dir, exist_ok=True)
     
-    # 최대 길이로 패딩
-    max_pred_len = max(len(tokens) for tokens in pred_tokens)
-    max_label_len = max(len(tokens) for tokens in label_tokens)
+    json_path = os.path.join(results_dir, f"comprehensive_experiment_{timestamp}.json")
     
-    padded_predictions = []
-    padded_labels = []
+    with open(json_path, 'w', encoding='utf-8') as f:
+        json.dump(results, f, ensure_ascii=False, indent=2)
     
-    for tokens in pred_tokens:
-        padded = tokens + [tokenizer.pad_token_id] * (max_pred_len - len(tokens))
-        padded_predictions.append(padded)
+    log.info(f"📁 실험 결과 저장: {json_path}")
+    return json_path
+
+def calculate_rouge_scores_with_baseline(predictions_ids: List[List[int]], labels_ids: List[List[int]], 
+                                         tokenizer, config, method_name: str) -> Dict[str, float]:
+    """
+    baseline.py의 compute_metrics를 사용하여 ROUGE 점수를 계산하고 즉시 출력
     
-    for tokens in label_tokens:
-        padded = tokens + [-100] * (max_label_len - len(tokens))  # -100은 손실 계산에서 무시됨
-        padded_labels.append(padded)
+    Args:
+        predictions_ids: 예측 결과 토큰 ID 리스트
+        labels_ids: 참조 답안 토큰 ID 리스트
+        tokenizer: 토크나이저
+        config: 설정 딕셔너리
+        method_name: 앙상블 방법 이름
+        
+    Returns:
+        ROUGE 점수 딕셔너리
+    """
+    try:
+        # 패딩을 사용해 동일한 길이로 맞추기 (수동 패딩 구현)
+        
+        # 최대 길이 계산
+        max_pred_len = max(len(seq) for seq in predictions_ids) if predictions_ids else 1
+        max_label_len = max(len(seq) for seq in labels_ids) if labels_ids else 1
+        max_len = max(max_pred_len, max_label_len)
+        
+        # 패딩 적용
+        pad_token_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else 0
+        
+        padded_predictions = []
+        padded_labels = []
+        
+        for seq in predictions_ids:
+            if len(seq) < max_len:
+                padded_seq = seq + [pad_token_id] * (max_len - len(seq))
+            else:
+                padded_seq = seq[:max_len]
+            padded_predictions.append(padded_seq)
+        
+        for seq in labels_ids:
+            if len(seq) < max_len:
+                # labels에는 -100으로 패딩 (compute_metrics가 무시함)
+                padded_seq = seq + [-100] * (max_len - len(seq))
+            else:
+                padded_seq = seq[:max_len]
+            padded_labels.append(padded_seq)
+        
+        # baseline.py 형식으로 데이터 준비
+        predictions_array = np.array(padded_predictions)
+        labels_array = np.array(padded_labels)
+        
+        # 예측 객체 생성 (baseline.py의 compute_metrics와 호환)
+        pred_object = type('PredictionOutput', (), {
+            'predictions': predictions_array,
+            'label_ids': labels_array
+        })()
+        
+        # 디버깅: compute_metrics 호출 전 데이터 확인
+        log.info(f"🔍 compute_metrics 호출 - predictions shape: {predictions_array.shape}, labels shape: {labels_array.shape}")
+        log.info(f"🔍 예측 샘플: {predictions_array[0][:10]} ...")
+        log.info(f"🔍 라벨 샘플: {labels_array[0][:10]} ...")
+        
+        # baseline.py의 compute_metrics 사용
+        metrics = compute_metrics(config, tokenizer, pred_object)
+        
+        # 디버깅: compute_metrics 결과 확인
+        log.info(f"🔍 compute_metrics 원본 결과: {metrics}")
+        
+        # 결과를 앙상블 형식으로 변환
+        rouge_scores = {
+            'rouge-1': metrics.get('rouge-1', 0.0),
+            'rouge-2': metrics.get('rouge-2', 0.0),
+            'rouge-l': metrics.get('rouge-l', 0.0)
+        }
+        rouge_scores['rouge-avg'] = (rouge_scores['rouge-1'] + rouge_scores['rouge-2'] + rouge_scores['rouge-l']) / 3
+        
+        # 즉시 결과 출력
+        log.info(f"")
+        log.info(f"🎯 {method_name} 완료!")
+        log.info(f"📊 ROUGE 점수:")
+        log.info(f"   - ROUGE-1: {rouge_scores['rouge-1']:.6f}")
+        log.info(f"   - ROUGE-2: {rouge_scores['rouge-2']:.6f}")
+        log.info(f"   - ROUGE-L: {rouge_scores['rouge-l']:.6f}")
+        log.info(f"   - ROUGE-avg: {rouge_scores['rouge-avg']:.6f}")
+        log.info(f"")
+        
+        return rouge_scores
+        
+    except Exception as e:
+        log.error(f"ROUGE 계산 실패 ({method_name}): {e}")
+        import traceback
+        log.error(f"스택 트레이스: {traceback.format_exc()}")
+        return {'rouge-1': 0.0, 'rouge-2': 0.0, 'rouge-l': 0.0, 'rouge-avg': 0.0}
+
+def convert_text_predictions_to_baseline_format(predictions: List[str], reference_summaries: List[str], 
+                                                tokenizer, config, method_name: str) -> Dict[str, float]:
+    """
+    텍스트 예측 결과를 baseline.py 방식으로 ROUGE 계산하는 공통 함수
     
-    # compute_metrics가 기대하는 형태의 EvalPrediction 객체 생성
-    EvalPrediction = namedtuple('EvalPrediction', ['predictions', 'label_ids'])
-    eval_pred = EvalPrediction(
-        predictions=np.array(padded_predictions),
-        label_ids=np.array(padded_labels)
-    )
+    Args:
+        predictions: 예측 텍스트 리스트
+        reference_summaries: 참조 텍스트 리스트
+        tokenizer: 토크나이저
+        config: 설정 딕셔너리
+        method_name: 앙상블 방법 이름
+        
+    Returns:
+        ROUGE 점수 딕셔너리
+    """
+    predictions_ids = []
+    labels_ids = []
     
-    # baseline.py의 compute_metrics 함수 직접 호출
-    metrics = compute_metrics(config, tokenizer, eval_pred)
+    # 참조 답안을 토큰 ID로 변환
+    for ref_text in reference_summaries:
+        ref_tokens = tokenizer(ref_text, return_tensors="pt", truncation=True, padding=False, max_length=512)
+        labels_ids.append(ref_tokens['input_ids'][0].tolist())
     
-    # rouge-avg 추가 (개별 모델과 동일한 방식)
-    if 'rouge-1' in metrics and 'rouge-2' in metrics and 'rouge-l' in metrics:
-        rouge_avg = (metrics['rouge-1'] + metrics['rouge-2'] + metrics['rouge-l']) / 3
-        metrics['rouge-avg'] = rouge_avg
+    # 예측 결과를 토큰 ID로 변환
+    for pred_text in predictions:
+        pred_tokens = tokenizer(pred_text, return_tensors="pt", truncation=True, padding=False, max_length=512)
+        predictions_ids.append(pred_tokens['input_ids'][0].tolist())
     
-    log.info("앙상블 결과 baseline.py 방식 평가 완료")
-    return metrics
+    # baseline.py의 compute_metrics 사용하여 ROUGE 계산
+    return calculate_rouge_scores_with_baseline(predictions_ids, labels_ids, tokenizer, config, method_name)
+
+def run_test_inference_for_method(models: List, tokenizers: List, configs: List, method_name: str, test_data: pd.DataFrame, timestamp: str) -> str:
+    """
+    특정 앙상블 방법으로 테스트 데이터 추론 수행 및 CSV 저장
+    
+    Args:
+        models: 로딩된 모델 리스트
+        tokenizers: 토크나이저 리스트  
+        configs: 설정 딕셔너리 리스트
+        method_name: 앙상블 방법 이름
+        test_data: 테스트 데이터프레임
+        timestamp: 타임스탬프
+        
+    Returns:
+        str: 저장된 CSV 파일 경로
+    """
+    log.info(f"🎯 {method_name} 테스트 데이터 추론 시작...")
+    
+    input_texts = test_data['dialogue'].tolist()
+    test_ids = test_data['fname'].tolist()
+    predictions = []
+    remove_tokens = configs[0]['inference']['remove_tokens']
+    
+    # 방법별 추론 수행
+    if method_name == "hard_voting":
+        predictions = test_inference_hard_voting(models, tokenizers, configs, input_texts, remove_tokens)
+    elif method_name == "soft_voting":
+        predictions = test_inference_soft_voting(models, tokenizers, configs, input_texts, remove_tokens)
+    elif method_name == "length_based":
+        predictions = test_inference_length_based(models, tokenizers, configs, input_texts, remove_tokens)
+    elif method_name == "logit_level":
+        predictions = test_inference_logit_level(models, tokenizers, configs, input_texts, remove_tokens)
+    elif method_name == "realtime_token_ensemble":
+        predictions = test_inference_realtime_token(models, tokenizers, configs, input_texts, remove_tokens)
+    else:
+        log.error(f"알 수 없는 방법: {method_name}")
+        return None
+    
+    # CSV 저장
+    results_dir = "./prediction"
+    os.makedirs(results_dir, exist_ok=True)
+    
+    csv_path = os.path.join(results_dir, f"{method_name}_{timestamp}.csv")
+    result_df = pd.DataFrame({
+        'id': test_ids,
+        'summary': predictions
+    })
+    
+    result_df.to_csv(csv_path, index=False, encoding='utf-8')
+    log.info(f"📁 {method_name} 테스트 결과 저장: {csv_path}")
+    
+    return csv_path
+
+# =============================================================================
+# 각 앙상블 기법별 평가 함수들
+# =============================================================================
 
 def prepare_validation_dataset_for_ensemble(config, preprocessor, tokenizer):
     """
@@ -284,26 +483,28 @@ def prepare_validation_dataset_for_ensemble(config, preprocessor, tokenizer):
         max_length=config['tokenizer']['encoder_max_len'], 
         return_token_type_ids=False
     )
+    
     val_tokenized_decoder_inputs = tokenizer(
         decoder_input_val, 
         return_tensors="pt", 
-        padding=True,
-        add_special_tokens=True, 
-        truncation=True, 
-        max_length=config['tokenizer']['decoder_max_len'], 
-        return_token_type_ids=False
-    )
-    val_tokenized_decoder_outputs = tokenizer(
-        decoder_output_val, 
-        return_tensors="pt", 
-        padding=True,
+        padding=True, 
         add_special_tokens=True, 
         truncation=True, 
         max_length=config['tokenizer']['decoder_max_len'], 
         return_token_type_ids=False
     )
     
-    # baseline.py와 동일한 DatasetForVal 클래스 사용
+    val_tokenized_decoder_outputs = tokenizer(
+        decoder_output_val, 
+        return_tensors="pt", 
+        padding=True, 
+        add_special_tokens=True, 
+        truncation=True, 
+        max_length=config['tokenizer']['decoder_max_len'], 
+        return_token_type_ids=False
+    )
+    
+    # 검증 데이터셋 생성 (baseline.py와 동일)
     val_inputs_dataset = DatasetForVal(
         val_tokenized_encoder_inputs, 
         val_tokenized_decoder_inputs, 
@@ -335,1354 +536,368 @@ def evaluate_single_model_with_baseline(model, tokenizer, config):
     val_inputs_dataset = prepare_validation_dataset_for_ensemble(config, preprocessor, tokenizer)
     
     # Seq2SeqTrainingArguments 설정 (학습 시와 동일한 파라미터, wandb 비활성화)
-    temp_dir = tempfile.mkdtemp()
     training_args = Seq2SeqTrainingArguments(
-        output_dir=temp_dir,
-        predict_with_generate=config['training']['predict_with_generate'],
-        generation_max_length=config['training']['generation_max_length'],
+        output_dir='./temp_eval_results',
         per_device_eval_batch_size=config['training']['per_device_eval_batch_size'],
-        seed=config['training']['seed'],
+        predict_with_generate=True,
+        generation_max_length=config['inference']['generate_max_length'],
+        generation_num_beams=config['inference']['num_beams'],
+        include_inputs_for_metrics=False,
         report_to=[],  # wandb 비활성화
-        logging_strategy="no",  # 로깅 비활성화
+        logging_strategy="no"
     )
-    
-    # compute_metrics 함수를 위한 wrapper (baseline.py와 동일)
-    def compute_metrics_wrapper(pred):
-        return compute_metrics(config, tokenizer, pred)
     
     # Seq2SeqTrainer 생성 (baseline.py와 동일한 방식)
     trainer = Seq2SeqTrainer(
         model=model,
         args=training_args,
-        eval_dataset=val_inputs_dataset,
         tokenizer=tokenizer,
-        compute_metrics=compute_metrics_wrapper
+        compute_metrics=lambda pred: compute_metrics(config, tokenizer, pred)
     )
     
-    # 평가 수행 (baseline.py와 완전히 동일한 방식)
     log.info("Seq2SeqTrainer를 사용한 평가 시작")
-    eval_results = trainer.evaluate()
-    log.info("평가 완료")
-    
-    # 결과 추출
-    rouge_results = {}
-    for key, value in eval_results.items():
-        if 'rouge' in key and key != 'eval_rouge_avg':
-            metric_name = key.replace('eval_', '')
-            rouge_results[metric_name] = value
-    
-    # rouge-avg 계산 추가
-    if 'rouge-1' in rouge_results and 'rouge-2' in rouge_results and 'rouge-l' in rouge_results:
-        rouge_avg = (rouge_results['rouge-1'] + rouge_results['rouge-2'] + rouge_results['rouge-l']) / 3
-        rouge_results['rouge-avg'] = rouge_avg
+    # 평가 수행 (baseline.py와 완전히 동일한 방식)
+    eval_results = trainer.evaluate(eval_dataset=val_inputs_dataset)
     
     # 임시 디렉토리 정리
-    if os.path.exists(temp_dir):
-        shutil.rmtree(temp_dir, ignore_errors=True)
+    import shutil
+    if os.path.exists('./temp_eval_results'):
+        shutil.rmtree('./temp_eval_results')
+    
+    log.info("baseline.py 방식 검증 점수 계산 완료")
+    
+    # rouge 결과만 추출
+    rouge_results = {
+        'rouge-1': eval_results['eval_rouge-1'],
+        'rouge-2': eval_results['eval_rouge-2'], 
+        'rouge-l': eval_results['eval_rouge-l'],
+        'rouge-avg': (eval_results['eval_rouge-1'] + eval_results['eval_rouge-2'] + eval_results['eval_rouge-l']) / 3
+    }
     
     return rouge_results
 
-class RealtimeTokenEnsemble:
-    """
-    실시간 토큰 단위 앙상블 클래스
-    각 스텝마다 모든 모델에서 다음 토큰 확률 분포를 획득하여 앙상블
-    """
+def evaluate_individual_models(models: List, tokenizers: List, configs: List, metadata_list: List, val_data: pd.DataFrame) -> List[Dict]:
+    """개별 모델들의 성능을 평가 (baseline.py 방식 사용)"""
+    log.info("🔍 개별 모델 성능 평가 시작")
     
-    def __init__(self, model_paths, device="cuda:0"):
-        """
-        Args:
-            model_paths: 모델 ZIP 파일 경로들의 리스트
-            device: 사용할 디바이스
-        """
-        self.model_paths = model_paths
-        self.device = device
-        self.models = []
-        self.tokenizers = []
-        self.configs = []
-        self.metadata_list = []
-        
-        log.info(f"실시간 토큰 앙상블 시스템 초기화: {len(model_paths)}개 모델")
-        log.info(f"사용 디바이스: {device}")
+    individual_scores = []
     
-    def load_models(self):
-        """모든 모델들을 로딩"""
-        log.info("모델들 로딩 시작...")
+    for i, (model, tokenizer, config, metadata) in enumerate(zip(models, tokenizers, configs, metadata_list)):
+        log.info(f"모델 {i+1}/{len(models)} 평가 중...")
         
-        for i, path in enumerate(self.model_paths):
-            log.info(f"모델 {i+1}/{len(self.model_paths)} 로딩 중: {path}")
-            
-            try:
-                model, tokenizer, config, metadata = load_model_package(path)
-                
-                # GPU 메모리 확인 및 모델 로딩
-                try:
-                    model.to(self.device)
-                    model.eval()
-                except RuntimeError as e:
-                    if "out of memory" in str(e).lower():
-                        log.error(f"GPU 메모리 부족으로 모델 {i+1} 로딩 실패. CPU로 fallback 시도...")
-                        if torch.cuda.is_available():
-                            torch.cuda.empty_cache()  # GPU 메모리 정리
-                        self.device = "cpu"
-                        model.to(self.device)
-                        model.eval()
-                        log.warning(f"모델 {i+1}을 CPU에서 실행합니다. 성능이 느려질 수 있습니다.")
-                    else:
-                        raise
-                
-                self.models.append(model)
-                self.tokenizers.append(tokenizer)
-                self.configs.append(config)
-                self.metadata_list.append(metadata)
-                
-                log.info(f"모델 {i+1} 로딩 완료: {metadata.get('wandb_run_name', 'Unknown')} (device: {self.device})")
-                
-            except Exception as e:
-                log.error(f"모델 {i+1} 로딩 실패: {e}")
-                log.error(f"경로: {path}")
-                raise
+        # baseline.py 방식으로 정확한 검증 점수 계산
+        rouge_scores = evaluate_single_model_with_baseline(model, tokenizer, config)
         
-        log.info(f"총 {len(self.models)}개 모델 로딩 완료")
-    
-    def generate_ensemble_sequence_single(self, input_text, config):
-        """
-        단일 텍스트에 대한 실시간 토큰 앙상블 (개선된 로직)
+        # ROUGE 점수 즉시 출력
+        log.info(f"")
+        log.info(f"🎯 개별 모델 {i+1} 완료!")
+        log.info(f"📊 ROUGE 점수:")
+        log.info(f"   - ROUGE-1: {rouge_scores['rouge-1']:.6f}")
+        log.info(f"   - ROUGE-2: {rouge_scores['rouge-2']:.6f}")
+        log.info(f"   - ROUGE-L: {rouge_scores['rouge-l']:.6f}")
+        log.info(f"   - ROUGE-avg: {rouge_scores['rouge-avg']:.6f}")
+        log.info(f"")
         
-        Args:
-            input_text: 단일 입력 텍스트
-            config: 생성 설정
-            
-        Returns:
-            str: 생성된 텍스트
-        """
-        tokenizer = self.tokenizers[0]
-        max_length = config['inference']['generate_max_length']
-        
-        # 입력 토큰화
-        inputs = tokenizer(
-            input_text,
-            return_tensors="pt",
-            max_length=config['tokenizer']['encoder_max_len'],
-            truncation=True,
-            padding=True
-        ).to(self.device)
-        
-        # 🚀 핵심 최적화: 각 모델의 encoder output을 한 번만 계산
-        model_encoder_outputs = []
-        for model in self.models:
-            with torch.no_grad():
-                encoder_outputs = model.get_encoder()(
-                    input_ids=inputs['input_ids'], 
-                    attention_mask=inputs['attention_mask']
-                )
-                model_encoder_outputs.append(encoder_outputs.last_hidden_state)
-        
-        # 디코더 시작 토큰
-        decoder_start_token_id = tokenizer.bos_token_id
-        if decoder_start_token_id is None:
-            decoder_start_token_id = tokenizer.eos_token_id
-        
-        # 생성된 시퀀스 (시작 토큰으로 초기화)
-        generated_sequence = [decoder_start_token_id]
-        eos_token_id = tokenizer.eos_token_id
-        
-        # 🔄 토큰별 생성 루프
-        for step in range(max_length - 1):
-            # 현재까지의 시퀀스를 텐서로 변환
-            current_ids = torch.tensor([generated_sequence], device=self.device)
-            
-            # 각 모델에서 다음 토큰 logits 계산
-            model_logits = []
-            successful_models = 0
-            
-            for i, model in enumerate(self.models):
-                try:
-                    with torch.no_grad():
-                        # 디코더 실행 (미리 계산된 encoder output 사용)
-                        decoder_outputs = model.get_decoder()(
-                            input_ids=current_ids,
-                            encoder_hidden_states=model_encoder_outputs[i],
-                            encoder_attention_mask=inputs['attention_mask']
-                        )
-                        
-                        # LM head로 vocabulary logits 계산
-                        logits = model.lm_head(decoder_outputs.last_hidden_state)
-                        next_token_logits = logits[0, -1, :]  # 마지막 위치의 logits
-                        
-                        model_logits.append(next_token_logits)
-                        successful_models += 1
-                        
-                except Exception as e:
-                    log.warning(f"모델 {i+1} 스텝 {step} 오류: {e}")
-                    continue
-            
-            if successful_models == 0:
-                log.error(f"스텝 {step}: 모든 모델 실패")
-                break
-            
-            # 🧮 성공한 모델들의 logits 평균 계산
-            if len(model_logits) > 1:
-                ensemble_logits = torch.stack(model_logits).mean(dim=0)
-            else:
-                ensemble_logits = model_logits[0]
-            
-            # 🎯 Greedy decoding: 가장 높은 확률의 토큰 선택
-            next_token_id = torch.argmax(ensemble_logits).item()
-            
-            # 생성된 토큰을 시퀀스에 추가
-            generated_sequence.append(next_token_id)
-            
-            # ✅ EOS 토큰 도달 시 생성 종료
-            if next_token_id == eos_token_id:
-                log.debug(f"EOS 도달: 스텝 {step}, 길이 {len(generated_sequence)}")
-                break
-        
-        # 🔤 텍스트로 디코딩 (baseline.py와 동일하게 특수 토큰 유지)
-        generated_text = tokenizer.decode(generated_sequence, skip_special_tokens=False)
-        
-        # 불필요한 토큰 제거
-        for token in config['inference']['remove_tokens']:
-            generated_text = generated_text.replace(token, " ")
-            
-        return generated_text.strip()
-    
-    def generate_ensemble_sequence(self, input_ids, config):
-        """
-        배치 처리를 위한 래퍼 (하위 호환성)
-        
-        Args:
-            input_ids: 입력 토큰 ID
-            attention_mask: 어텐션 마스크  
-            config: 생성 설정
-            
-        Returns:
-            torch.Tensor: 생성된 시퀀스
-        """
-        # 단일 텍스트 처리로 위임
-        tokenizer = self.tokenizers[0]
-        input_text = tokenizer.decode(input_ids[0], skip_special_tokens=True)
-        generated_text = self.generate_ensemble_sequence_single(input_text, config)
-        
-        # 다시 토큰화하여 반환
-        generated_ids = tokenizer(
-            generated_text, 
-            return_tensors="pt",
-            add_special_tokens=False
-        )['input_ids']
-        
-        return generated_ids
-    
-    def generate_with_realtime_ensemble(self, input_texts, config):
-        """
-        실시간 앙상블로 텍스트 생성 (개선된 버전)
-        
-        Args:
-            input_texts: 입력 텍스트 리스트
-            config: 생성 설정
-            
-        Returns:
-            list: 생성된 텍스트 리스트
-        """
-        results = []
-        
-        log.info(f"Realtime Token Ensemble 시작: {len(input_texts)}개 텍스트")
-        
-        for i, text in enumerate(tqdm(input_texts, desc="실시간 토큰 앙상블 처리 중")):
-            try:
-                # 🚀 개선된 단일 텍스트 처리 사용
-                generated_text = self.generate_ensemble_sequence_single(text, config)
-                results.append(generated_text)
-                
-                # 진행 상황 로깅 (매 10개마다)
-                if (i + 1) % 10 == 0:
-                    log.info(f"진행 상황: {i+1}/{len(input_texts)} 완료")
-                
-            except Exception as e:
-                log.warning(f"텍스트 {i+1} 실시간 앙상블 오류: {e}")
-                results.append("")  # 빈 문자열로 fallback
-        
-        log.info("Realtime Token Ensemble 완료")
-        return results
-    
-    def generate_with_single_model(self, model, tokenizer, config, input_texts):
-        """
-        비교를 위한 단일 모델 텍스트 생성
-        
-        Args:
-            model: 모델
-            tokenizer: 토크나이저  
-            config: 설정
-            input_texts: 입력 텍스트 리스트
-            
-        Returns:
-            list: 생성된 텍스트 리스트
-        """
-        results = []
-        
-        for text in tqdm(input_texts, desc="단일 모델 텍스트 생성 중"):
-            try:
-                inputs = tokenizer(
-                    text, 
-                    return_tensors="pt", 
-                    max_length=config['tokenizer']['encoder_max_len'],
-                    truncation=True,
-                    padding=True
-                ).to(self.device)
-                
-                with torch.no_grad():
-                    generated_ids = model.generate(
-                        input_ids=inputs['input_ids'],
-                        attention_mask=inputs['attention_mask'],
-                        max_length=config['inference']['generate_max_length'],
-                        num_beams=config['inference']['num_beams'],
-                        no_repeat_ngram_size=config['inference']['no_repeat_ngram_size'],
-                        early_stopping=config['inference']['early_stopping']
-                    )
-                
-                generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=False)
-                
-                # 불필요한 토큰 제거
-                for token in config['inference']['remove_tokens']:
-                    generated_text = generated_text.replace(token, " ")
-                
-                results.append(generated_text.strip())
-                
-            except Exception as e:
-                log.warning(f"텍스트 생성 중 오류 (fallback 사용): {e}")
-                results.append("")  # 빈 문자열로 fallback
-        
-        return results
-    
-    def generate_token_ids_with_single_model(self, model, tokenizer, config, input_texts):
-        """
-        단일 모델로 토큰 ID 생성 (토큰 레벨 앙상블을 위함)
-        
-        Args:
-            model: 모델
-            tokenizer: 토크나이저  
-            config: 설정
-            input_texts: 입력 텍스트 리스트
-            
-        Returns:
-            list: 생성된 토큰 ID 텐서 리스트
-        """
-        results = []
-        
-        for text in tqdm(input_texts, desc="단일 모델 토큰 ID 생성 중"):
-            try:
-                inputs = tokenizer(
-                    text, 
-                    return_tensors="pt", 
-                    max_length=config['tokenizer']['encoder_max_len'],
-                    truncation=True,
-                    padding=True
-                ).to(self.device)
-                
-                with torch.no_grad():
-                    generated_ids = model.generate(
-                        input_ids=inputs['input_ids'],
-                        attention_mask=inputs['attention_mask'],
-                        max_length=config['inference']['generate_max_length'],
-                        num_beams=config['inference']['num_beams'],
-                        no_repeat_ngram_size=config['inference']['no_repeat_ngram_size'],
-                        early_stopping=config['inference']['early_stopping']
-                    )
-                
-                # 토큰 ID를 CPU로 이동하여 저장
-                results.append(generated_ids[0].cpu())
-                
-            except Exception as e:
-                log.warning(f"토큰 ID 생성 중 오류 (fallback 사용): {e}")
-                # 빈 토큰 시퀀스 생성 (pad_token_id만 포함)
-                fallback_ids = torch.tensor([tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id])
-                results.append(fallback_ids)
-        
-        return results
-    
-    def evaluate_on_validation(self, val_data_path):
-        """
-        실시간 앙상블 검증 데이터 평가
-        
-        Args:
-            val_data_path: 검증 데이터 경로
-            
-        Returns:
-            dict: 평가 결과
-        """
-        import time
-        
-        log.info(f"Realtime Token Ensemble 검증 데이터 평가 시작: {val_data_path}")
-        
-        # 검증 데이터 로드
-        try:
-            val_df = pd.read_csv(val_data_path)
-            
-            # 필수 컬럼 존재 확인
-            required_columns = ['dialogue', 'summary']
-            for col in required_columns:
-                if col not in val_df.columns:
-                    log.error(f"검증 데이터에 필수 컬럼 '{col}'이 없습니다. 사용 가능한 컬럼: {list(val_df.columns)}")
-                    return None
-            
-            val_df_sample = val_df.head(50)  # 빠른 테스트를 위해 50개만
-            input_texts = val_df_sample['dialogue'].tolist()
-            reference_summaries = val_df_sample['summary'].tolist()
-            
-            # 빈 데이터 확인
-            if not input_texts or not reference_summaries:
-                log.error("검증 데이터가 비어있습니다.")
-                return None
-                
-            log.info(f"검증 데이터 로드 완료: {len(input_texts)}개 샘플")
-        except FileNotFoundError:
-            log.error(f"검증 데이터 파일을 찾을 수 없습니다: {val_data_path}")
-            return None
-        except pd.errors.EmptyDataError:
-            log.error(f"검증 데이터 파일이 비어있습니다: {val_data_path}")
-            return None
-        except Exception as e:
-            log.error(f"검증 데이터 로드 실패: {e}")
-            return None
-        
-        # 시간 측정 시작
-        start_time = time.time()
-        
-        # Realtime Token Ensemble으로 생성
-        log.info("Realtime Token Ensemble 생성 시작...")
-        realtime_results = self.generate_with_realtime_ensemble(input_texts, self.configs[0])
-        
-        generation_time = time.time() - start_time
-        log.info(f"Realtime Token Ensemble 생성 완료: {generation_time:.2f}초")
-        
-        # ROUGE 점수 계산 (baseline.py와 동일한 방식으로 수정)
-        def calculate_rouge_scores(predictions, references, method_name):
-            from rouge import Rouge
-            rouge = Rouge()
-            
-            # baseline.py와 동일한 방식으로 토큰 제거 (정확한 평가를 위해)
-            replaced_predictions = predictions.copy()
-            replaced_references = references.copy()
-            remove_tokens = self.configs[0]['inference']['remove_tokens']
-            for token in remove_tokens:
-                replaced_predictions = [sentence.replace(token, " ") for sentence in replaced_predictions]
-                replaced_references = [sentence.replace(token, " ") for sentence in replaced_references]
-            
-            # baseline.py와 동일한 방식으로 정규화
-            cleaned_predictions = []
-            cleaned_references = []
-            for pred, ref in zip(replaced_predictions, replaced_references):
-                # 공백 정리 (baseline.py의 clean_up_tokenization_spaces=True 효과 모방)
-                pred_clean = " ".join(pred.split()).strip()
-                ref_clean = " ".join(ref.split()).strip()
-                    
-                cleaned_predictions.append(pred_clean)
-                cleaned_references.append(ref_clean)
-            
-            try:
-                # 빈 문자열이 있으면 rouge 계산 실패할 수 있으므로 처리
-                final_predictions = []
-                final_references = []
-                for pred, ref in zip(cleaned_predictions, cleaned_references):
-                    if pred.strip() and ref.strip():
-                        final_predictions.append(pred)
-                        final_references.append(ref)
-                    else:
-                        # 빈 문자열인 경우 "empty"로 대체
-                        final_predictions.append("empty" if not pred.strip() else pred)
-                        final_references.append("empty" if not ref.strip() else ref)
-                
-                rouge_results = rouge.get_scores(final_predictions, final_references, avg=True)
-                rouge_scores = {key: value["f"] for key, value in rouge_results.items()}
-                # rouge-avg 계산 추가
-                rouge_avg = (rouge_scores['rouge-1'] + rouge_scores['rouge-2'] + rouge_scores['rouge-l']) / 3
-                rouge_scores['rouge-avg'] = rouge_avg
-                
-                log.info(f"{method_name} 검증 점수 - ROUGE-1: {rouge_scores['rouge-1']:.4f}, "
-                        f"ROUGE-2: {rouge_scores['rouge-2']:.4f}, ROUGE-L: {rouge_scores['rouge-l']:.4f}, "
-                        f"ROUGE-avg: {rouge_scores['rouge-avg']:.4f}")
-                return rouge_scores
-            except Exception as e:
-                log.warning(f"{method_name} ROUGE 계산 오류: {e}")
-                return {'rouge-1': 0.0, 'rouge-2': 0.0, 'rouge-l': 0.0, 'rouge-avg': 0.0}
-        
-        realtime_scores = calculate_rouge_scores(realtime_results, reference_summaries, "Realtime Token Ensemble")
-        
-        evaluation_results = {
-            'realtime_token_ensemble_scores': realtime_scores,
-            'generation_time_seconds': generation_time,
-            'num_validation_samples': len(input_texts)
-        }
-        
-        log.info("Realtime Token Ensemble 검증 데이터 평가 완료")
-        return evaluation_results
-    
-    def run_ensemble(self, test_data_path):
-        """
-        Realtime Token Ensemble 실행
-        
-        Args:
-            test_data_path: 테스트 데이터 경로
-            
-        Returns:
-            tuple: (ensemble_result_df, generation_time)
-        """
-        import time
-        
-        log.info(f"Realtime Token Ensemble 추론 시작: {test_data_path}")
-        
-        # 테스트 데이터 로드
-        try:
-            test_df = pd.read_csv(test_data_path)
-            test_df_sample = test_df.head(200)  # 200개 테스트 데이터 처리
-            input_texts = test_df_sample['dialogue'].tolist()
-            log.info(f"테스트 데이터 로드 완료: {len(input_texts)}개 샘플")
-        except Exception as e:
-            log.error(f"테스트 데이터 로드 실패: {e}")
-            return None, 0
-        
-        # 시간 측정
-        start_time = time.time()
-        
-        # Realtime Token Ensemble 실행
-        realtime_results = self.generate_with_realtime_ensemble(input_texts, self.configs[0])
-        
-        generation_time = time.time() - start_time
-        log.info(f"Realtime Token Ensemble 완료: {generation_time:.2f}초")
-        
-        # 결과 데이터프레임 생성
-        realtime_df = pd.DataFrame({
-            'fname': test_df_sample['fname'],
-            'summary': realtime_results
+        individual_scores.append({
+            'model_index': i + 1,
+            'model_metadata': metadata,
+            'rouge_scores': rouge_scores
         })
-        
-        return realtime_df, generation_time
+    
+    return individual_scores
 
-def main_comprehensive_experiment():
-    """
-    🔬 다섯 가지 앙상블 방식 종합 비교 실험
+def evaluate_hard_voting(models: List, tokenizers: List, configs: List, val_data: pd.DataFrame) -> Dict[str, float]:
+    """하드 보팅 앙상블 평가"""
+    log.info("🗳️  하드 보팅 앙상블 시작...")
     
-    1. 하드 보팅 (Token-level Hard Voting)
-    2. 소프트 보팅 (Probability-based Soft Voting) 
-    3. 길이 기반 (Length-based Selection)
-    4. Logit 레벨 앙상블 (Logit-level Ensemble)
-    5. 실시간 토큰 앙상블 (Realtime Token Ensemble)
-    """
-    import time
+    input_texts = val_data['dialogue'].tolist()
+    reference_summaries = val_data['summary'].tolist()
+    remove_tokens = configs[0]['inference']['remove_tokens']
+    tokenizer = tokenizers[0]
     
-    log.info("🔬 " + "="*60)
-    log.info("🎯 다섯 가지 앙상블 방식 종합 비교 실험 시작")
-    log.info("="*60)
-    
-    # 공통 함수로 모델 경로 가져오기
-    existing_model_paths = get_model_paths()
-    if not existing_model_paths:
-        log.error("💥 사용 가능한 모델 파일이 없습니다!")
-        return
-    
-    log.info(f"🚀 총 {len(existing_model_paths)}개 모델로 실험 진행")
-    
-    # 데이터 경로 확인
-    val_data_path = "../../input/data/dev.csv"
-    test_data_path = "../../input/data/test.csv"
-    
-    if not os.path.exists(val_data_path):
-        log.error(f"💥 검증 데이터 없음: {val_data_path}")
-        return
-    if not os.path.exists(test_data_path):
-        log.error(f"💥 테스트 데이터 없음: {test_data_path}")
-        return
-    
-    device = "cuda:0" if torch.cuda.is_available() else "cpu"
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    
-    # 실험 결과를 저장할 딕셔너리
-    experiment_results = {
-        'timestamp': timestamp,
-        'model_paths': existing_model_paths,
-        'device': device,
-        'methods': {},
-        'performance_ranking': [],
-        'time_ranking': []
-    }
-    
-    # 📊 실험 1: HardVotingEnsemble의 세 가지 방식
-    log.info("\n" + "🔥 " + "="*50)
-    log.info("📊 실험 1: Post-processing 앙상블 방식들")
-    log.info("="*50)
-    
-    hard_ensemble = PostProcessingEnsemble(existing_model_paths, device=device)
-    hard_ensemble.load_models()
-    
-    # 검증 데이터 평가
-    start_time = time.time()
-    hard_evaluation = hard_ensemble.evaluate_on_validation(val_data_path)
-    hard_time = time.time() - start_time
-    
-    if hard_evaluation:
-        experiment_results['methods']['hard_voting'] = {
-            'rouge_scores': hard_evaluation['hard_voting_scores'],
-            'time_seconds': hard_time,
-            'method_type': 'Post-processing'
-        }
-        experiment_results['methods']['soft_voting'] = {
-            'rouge_scores': hard_evaluation['soft_voting_scores'],
-            'time_seconds': hard_time,  # 같은 실행에서 나온 결과
-            'method_type': 'Post-processing'
-        }
-        experiment_results['methods']['length_based'] = {
-            'rouge_scores': hard_evaluation['length_based_scores'],
-            'time_seconds': hard_time,  # 같은 실행에서 나온 결과  
-            'method_type': 'Post-processing'
-        }
-        experiment_results['methods']['logit_level'] = {
-            'rouge_scores': hard_evaluation['logit_level_scores'],
-            'time_seconds': hard_time,  # 같은 실행에서 나온 결과
-            'method_type': 'Post-processing'
-        }
-    
-    # 📊 실험 2: RealtimeTokenEnsemble
-    log.info("\n" + "🔥 " + "="*50)
-    log.info("⚡ 실험 2: 실시간 토큰 앙상블")
-    log.info("="*50)
-    
-    try:
-        realtime_ensemble = RealtimeTokenEnsemble(existing_model_paths, device=device)
-        realtime_ensemble.load_models()
+    # 각 모델별로 토큰 ID 생성
+    all_generated_token_ids = []
+    for i, (model, model_tokenizer, config) in enumerate(zip(models, tokenizers, configs)):
+        model_token_ids = []
+        for text in tqdm(input_texts, desc=f"하드보팅 - 모델 {i+1} 토큰 생성"):
+            try:
+                inputs = model_tokenizer(
+                    text,
+                    return_tensors="pt",
+                    max_length=config['tokenizer']['encoder_max_len'],
+                    truncation=True,
+                    padding=True
+                ).to(model.device)
+                
+                with torch.no_grad():
+                    output_ids = model.generate(
+                        input_ids=inputs['input_ids'],
+                        attention_mask=inputs['attention_mask'],
+                        max_length=config['inference']['generate_max_length'],
+                        num_beams=config['inference']['num_beams'],
+                        no_repeat_ngram_size=config['inference']['no_repeat_ngram_size'],
+                        early_stopping=config['inference']['early_stopping']
+                    )
+                
+                generated_ids = output_ids[0].tolist()
+                model_token_ids.append(generated_ids)
+                
+            except Exception as e:
+                log.warning(f"하드보팅 모델 {i+1} 샘플 생성 실패: {e}")
+                model_token_ids.append([])
         
-        # 검증 데이터 평가
-        start_time = time.time()
-        realtime_evaluation = realtime_ensemble.evaluate_on_validation(val_data_path)
-        realtime_time = time.time() - start_time
-        
-        if realtime_evaluation:
-            experiment_results['methods']['realtime_token_ensemble'] = {
-                'rouge_scores': realtime_evaluation['realtime_token_ensemble_scores'],
-                'time_seconds': realtime_time,
-                'method_type': 'Runtime'
-            }
-    except Exception as e:
-        log.error(f"실시간 토큰 앙상블 실행 오류: {e}")
-        experiment_results['methods']['realtime_token_ensemble'] = {
-            'error': str(e),
-            'method_type': 'Runtime'
-        }
+        all_generated_token_ids.append(model_token_ids)
     
-    # 📈 성능 순위 분석
-    log.info("\n" + "🏆 " + "="*50)
-    log.info("📈 종합 성능 분석 결과")
-    log.info("="*50)
-    
-    # ROUGE-avg 기준 성능 순위
-    performance_data = []
-    for method_name, method_data in experiment_results['methods'].items():
-        if 'rouge_scores' in method_data:
-            rouge_avg = method_data['rouge_scores']['rouge-avg']
-            time_taken = method_data['time_seconds']
-            performance_data.append((method_name, rouge_avg, time_taken))
-    
-    if performance_data:
-        # 성능순 정렬
-        performance_data.sort(key=lambda x: x[1], reverse=True)
-        experiment_results['performance_ranking'] = performance_data
-        
-        # 속도순 정렬
-        time_data = sorted(performance_data, key=lambda x: x[2])
-        experiment_results['time_ranking'] = time_data
-        
-        log.info("🥇 성능 순위 (ROUGE-avg 기준):")
-        for i, (method, rouge_avg, time_taken) in enumerate(performance_data, 1):
-            method_type = experiment_results['methods'][method]['method_type']
-            log.info(f"  {i}위. {method}: {rouge_avg:.4f} ({time_taken:.1f}초, {method_type})")
-        
-        log.info("\n⚡ 속도 순위:")
-        for i, (method, rouge_avg, time_taken) in enumerate(time_data, 1):
-            method_type = experiment_results['methods'][method]['method_type']
-            log.info(f"  {i}위. {method}: {time_taken:.1f}초 (ROUGE-avg: {rouge_avg:.4f})")
-        
-        # 📊 상세 점수 출력
-        log.info("\n📊 상세 ROUGE 점수:")
-        for method_name, method_data in experiment_results['methods'].items():
-            if 'rouge_scores' in method_data:
-                scores = method_data['rouge_scores']
-                log.info(f"\n🔹 {method_name}:")
-                log.info(f"   ROUGE-1: {scores['rouge-1']:.4f}")
-                log.info(f"   ROUGE-2: {scores['rouge-2']:.4f}")
-                log.info(f"   ROUGE-L: {scores['rouge-l']:.4f}")
-                log.info(f"   ROUGE-avg: {scores['rouge-avg']:.4f}")
-                log.info(f"   실행시간: {method_data['time_seconds']:.1f}초")
-        
-        # 🎯 최적 방식 추천
-        best_performance = performance_data[0]
-        fastest_method = time_data[0]
-        
-        log.info("\n" + "🎯 " + "="*50)
-        log.info("💡 추천 결과")
-        log.info("="*50)
-        log.info(f"🏆 최고 성능: {best_performance[0]} (ROUGE-avg: {best_performance[1]:.4f})")
-        log.info(f"⚡ 최고 속도: {fastest_method[0]} ({fastest_method[2]:.1f}초)")
-        
-        # 성능 vs 속도 trade-off 분석
-        performance_gap = best_performance[1] - fastest_method[1] 
-        speed_ratio = fastest_method[2] / best_performance[2]
-        
-        if performance_gap < 0.01 and speed_ratio < 0.5:
-            log.info(f"💎 추천: {fastest_method[0]} (성능 차이 미미하고 속도 우수)")
-        elif performance_gap > 0.02:
-            log.info(f"💎 추천: {best_performance[0]} (성능 차이 유의미)")
-        else:
-            log.info("💭 성능과 속도를 고려하여 용도에 맞게 선택하세요")
-    
-    # 📈 테스트 데이터 추론 및 CSV 저장
-    log.info("\n" + "💾 " + "="*50)
-    log.info("📤 테스트 데이터 추론 및 CSV 저장 시작")
-    log.info("="*50)
-    
-    # 결과 저장 디렉토리 생성
-    results_dir = "./ensemble_results"
-    os.makedirs(results_dir, exist_ok=True)
-    
-    # 테스트 데이터 경로 확인
-    if os.path.exists(test_data_path):
-        # PostProcessingEnsemble로 3가지 방식 추론
-        if hard_ensemble:
-            log.info("📊 후처리 앙상블 방식들로 테스트 데이터 추론 중...")
-            ensemble_results_dict, _ = hard_ensemble.run_ensemble(test_data_path)
-            
-            # 각 방식별 CSV 저장
-            hard_voting_path = os.path.join(results_dir, f"ensemble_hard_voting_{timestamp}.csv")
-            ensemble_results_dict['hard_voting'].to_csv(hard_voting_path, index=False, encoding='utf-8')
-            log.info(f"💾 하드 보팅 결과 저장: {hard_voting_path}")
-            
-            soft_voting_path = os.path.join(results_dir, f"ensemble_soft_voting_{timestamp}.csv")
-            ensemble_results_dict['soft_voting'].to_csv(soft_voting_path, index=False, encoding='utf-8')
-            log.info(f"💾 소프트 보팅 결과 저장: {soft_voting_path}")
-            
-            length_based_path = os.path.join(results_dir, f"ensemble_length_based_{timestamp}.csv")
-            ensemble_results_dict['length_based'].to_csv(length_based_path, index=False, encoding='utf-8')
-            log.info(f"💾 길이 기반 결과 저장: {length_based_path}")
-            
-            logit_level_path = os.path.join(results_dir, f"ensemble_logit_level_{timestamp}.csv")
-            ensemble_results_dict['logit_level'].to_csv(logit_level_path, index=False, encoding='utf-8')
-            log.info(f"💾 Logit 레벨 결과 저장: {logit_level_path}")
-        
-        # RealtimeTokenEnsemble로 실시간 토큰 앙상블 추론
+    # 하드 보팅으로 앙상블
+    predictions = []
+    for sample_idx in tqdm(range(len(input_texts)), desc="하드보팅 앙상블 처리"):
         try:
-            if 'realtime_token_ensemble' in experiment_results['methods'] and 'error' not in experiment_results['methods']['realtime_token_ensemble']:
-                log.info("⚡ 실시간 토큰 앙상블로 테스트 데이터 추론 중...")
-                realtime_ensemble = RealtimeTokenEnsemble(existing_model_paths, device=device)
-                realtime_ensemble.load_models()
-                
-                realtime_df, _ = realtime_ensemble.run_ensemble(test_data_path)
-                realtime_path = os.path.join(results_dir, f"ensemble_realtime_token_{timestamp}.csv")
-                realtime_df.to_csv(realtime_path, index=False, encoding='utf-8')
-                log.info(f"💾 실시간 토큰 앙상블 결과 저장: {realtime_path}")
-        except Exception as e:
-            log.warning(f"실시간 토큰 앙상블 테스트 추론 중 오류: {e}")
-    else:
-        log.warning(f"테스트 데이터 파일이 없어 CSV 저장을 건너뜁니다: {test_data_path}")
-    
-    # 실험 메타데이터 저장
-    experiment_metadata_path = os.path.join(results_dir, f"comprehensive_experiment_{timestamp}.json")
-    with open(experiment_metadata_path, "w", encoding='utf-8') as f:
-        json.dump(experiment_results, f, indent=2, ensure_ascii=False)
-    log.info(f"\n💾 실험 메타데이터 저장: {experiment_metadata_path}")
-    
-    log.info("\n" + "🎉 " + "="*50)
-    log.info("✅ 종합 비교 실험 완료!")
-    log.info("="*50)
-    
-    return experiment_results
-
-class PostProcessingEnsemble:
-    """
-    후처리 기반 앙상블 추론 클래스
-    각 모델이 독립적으로 완전한 텍스트를 생성한 후 다양한 방식으로 앙상블:
-    - 하드 보팅: 토큰 단위 다수결
-    - 소프트 보팅: 확률 분포 평균
-    - 길이 기반: 가장 긴 결과 선택
-    """
-    
-    def __init__(self, model_paths, device="cuda:0"):
-        """
-        Args:
-            model_paths: 모델 ZIP 파일 경로들의 리스트
-            device: 사용할 디바이스
-        """
-        self.model_paths = model_paths
-        self.device = device
-        self.models = []
-        self.tokenizers = []
-        self.configs = []
-        self.metadata_list = []
-        
-        log.info(f"앙상블 시스템 초기화: {len(model_paths)}개 모델")
-        log.info(f"사용 디바이스: {device}")
-    
-    def load_models(self):
-        """모든 모델들을 로딩"""
-        log.info("모델들 로딩 시작...")
-        
-        for i, path in enumerate(self.model_paths):
-            log.info(f"모델 {i+1}/{len(self.model_paths)} 로딩 중: {path}")
+            # 모든 모델의 토큰 ID들을 수집
+            all_sequences = []
+            for model_idx in range(len(models)):
+                if sample_idx < len(all_generated_token_ids[model_idx]):
+                    sequence = all_generated_token_ids[model_idx][sample_idx]
+                    if sequence:  # 빈 시퀀스가 아니면
+                        all_sequences.append(sequence)
             
-            try:
-                model, tokenizer, config, metadata = load_model_package(path)
-                
-                # GPU 메모리 확인 및 모델 로딩
-                try:
-                    model.to(self.device)
-                    model.eval()
-                except RuntimeError as e:
-                    if "out of memory" in str(e).lower():
-                        log.error(f"GPU 메모리 부족으로 모델 {i+1} 로딩 실패. CPU로 fallback 시도...")
-                        if torch.cuda.is_available():
-                            torch.cuda.empty_cache()  # GPU 메모리 정리
-                        self.device = "cpu"
-                        model.to(self.device)
-                        model.eval()
-                        log.warning(f"모델 {i+1}을 CPU에서 실행합니다. 성능이 느려질 수 있습니다.")
-                    else:
-                        raise
-                
-                self.models.append(model)
-                self.tokenizers.append(tokenizer)
-                self.configs.append(config)
-                self.metadata_list.append(metadata)
-                
-                log.info(f"모델 {i+1} 로딩 완료: {metadata.get('wandb_run_name', 'Unknown')} (device: {self.device})")
-                
-            except Exception as e:
-                log.error(f"모델 {i+1} 로딩 실패: {e}")
-                log.error(f"경로: {path}")
-                raise
-        
-        log.info(f"총 {len(self.models)}개 모델 로딩 완료")
-    
-    def generate_with_single_model(self, model, tokenizer, config, input_texts):
-        """
-        단일 모델로 텍스트 생성
-        
-        Args:
-            model: 모델
-            tokenizer: 토크나이저  
-            config: 설정
-            input_texts: 입력 텍스트 리스트
-            
-        Returns:
-            list: 생성된 텍스트 리스트
-        """
-        results = []
-        
-        for text in tqdm(input_texts, desc="텍스트 생성 중"):
-            try:
-                inputs = tokenizer(
-                    text, 
-                    return_tensors="pt", 
-                    max_length=config['tokenizer']['encoder_max_len'],
-                    truncation=True,
-                    padding=True
-                ).to(self.device)
-                
-                with torch.no_grad():
-                    generated_ids = model.generate(
-                        input_ids=inputs['input_ids'],
-                        attention_mask=inputs['attention_mask'],
-                        max_length=config['inference']['generate_max_length'],
-                        num_beams=config['inference']['num_beams'],
-                        no_repeat_ngram_size=config['inference']['no_repeat_ngram_size'],
-                        early_stopping=config['inference']['early_stopping']
-                    )
-                
-                generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=False)
-                
-                # 불필요한 토큰 제거
-                for token in config['inference']['remove_tokens']:
-                    generated_text = generated_text.replace(token, " ")
-                
-                results.append(generated_text.strip())
-                
-            except Exception as e:
-                log.warning(f"텍스트 생성 중 오류 (fallback 사용): {e}")
-                results.append("")  # 빈 문자열로 fallback
-        
-        return results
-    
-    def generate_token_ids_with_single_model(self, model, tokenizer, config, input_texts):
-        """
-        단일 모델로 토큰 ID 생성 (토큰 레벨 앙상블을 위함)
-        
-        Args:
-            model: 모델
-            tokenizer: 토크나이저  
-            config: 설정
-            input_texts: 입력 텍스트 리스트
-            
-        Returns:
-            list: 생성된 토큰 ID 텐서 리스트
-        """
-        results = []
-        
-        for text in tqdm(input_texts, desc="토큰 ID 생성 중"):
-            try:
-                inputs = tokenizer(
-                    text, 
-                    return_tensors="pt", 
-                    max_length=config['tokenizer']['encoder_max_len'],
-                    truncation=True,
-                    padding=True
-                ).to(self.device)
-                
-                with torch.no_grad():
-                    generated_ids = model.generate(
-                        input_ids=inputs['input_ids'],
-                        attention_mask=inputs['attention_mask'],
-                        max_length=config['inference']['generate_max_length'],
-                        num_beams=config['inference']['num_beams'],
-                        no_repeat_ngram_size=config['inference']['no_repeat_ngram_size'],
-                        early_stopping=config['inference']['early_stopping']
-                    )
-                
-                # 토큰 ID를 CPU로 이동하여 저장
-                results.append(generated_ids[0].cpu())
-                
-            except Exception as e:
-                log.warning(f"토큰 ID 생성 중 오류 (fallback 사용): {e}")
-                # 빈 토큰 시퀀스 생성 (pad_token_id만 포함)
-                fallback_ids = torch.tensor([tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id])
-                results.append(fallback_ids)
-        
-        return results
-    
-    def token_id_level_hard_voting(self, token_ids_list, reference_tokenizer):
-        """
-        토큰 ID 레벨에서 진짜 하드 보팅 수행
-        
-        Args:
-            token_ids_list: 각 모델별 토큰 ID 텐서 리스트들 [model1_results, model2_results, ...]
-            reference_tokenizer: 기준 토크나이저
-            
-        Returns:
-            list: 앙상블된 텍스트 리스트
-        """
-        import torch
-        from collections import Counter
-        
-        ensemble_results = []
-        num_samples = len(token_ids_list[0])
-        
-        log.info("토큰 ID 레벨 하드 보팅 시작...")
-        
-        for i in tqdm(range(num_samples), desc="토큰 ID 앙상블 처리 중"):
-            # 각 샘플에 대한 모든 모델의 토큰 ID 수집
-            sample_token_ids = [model_results[i] for model_results in token_ids_list]
-            
-            # 빈 텐서 제거
-            valid_token_ids = [ids for ids in sample_token_ids if ids.numel() > 0]
-            
-            if not valid_token_ids:
-                ensemble_results.append("")
+            if not all_sequences:
+                predictions.append("")
                 continue
             
-            # 최대 길이 결정
-            max_len = max(len(ids) for ids in valid_token_ids)
+            # 가장 긴 시퀀스 길이 찾기
+            max_length = max(len(seq) for seq in all_sequences)
             
-            # 각 위치별로 토큰 ID 다수결
+            # 각 위치별로 다수결 투표
             ensemble_ids = []
-            for pos in range(max_len):
-                position_tokens = []
-                for ids in valid_token_ids:
-                    if pos < len(ids):
-                        token_id = ids[pos].item()
-                        # 패딩 토큰이나 특수 토큰 제외
-                        if token_id not in [reference_tokenizer.pad_token_id, reference_tokenizer.eos_token_id]:
-                            position_tokens.append(token_id)
+            for pos in range(max_length):
+                votes = []
+                for seq in all_sequences:
+                    if pos < len(seq):
+                        votes.append(seq[pos])
                 
-                if position_tokens:
-                    # 다수결로 토큰 선택
-                    counter = Counter(position_tokens)
-                    most_common_token = counter.most_common(1)[0][0]
-                    ensemble_ids.append(most_common_token)
-                else:
-                    # 모든 모델이 패딩이나 종료 토큰을 선택한 경우 종료
-                    break
-            
-            # 토큰 ID를 텍스트로 디코딩
-            if ensemble_ids:
-                try:
-                    ensemble_tensor = torch.tensor(ensemble_ids)
-                    generated_text = reference_tokenizer.decode(ensemble_tensor, skip_special_tokens=False)
-                    
-                    # 불필요한 토큰 제거 (baseline.py와 동일한 방식)
-                    config = self.configs[0]  # 첫 번째 설정 사용
-                    for token in config['inference']['remove_tokens']:
-                        generated_text = generated_text.replace(token, " ")
-                    
-                    ensemble_results.append(generated_text.strip())
-                except Exception as e:
-                    log.warning(f"토큰 디코딩 실패: {e}")
-                    ensemble_results.append("")
-            else:
-                ensemble_results.append("")
-        
-        log.info("토큰 ID 레벨 하드 보팅 완료")
-        return ensemble_results
-    
-    def token_level_hard_voting(self, generated_texts_list, reference_tokenizer):
-        """
-        토큰 단위 하드 보팅
-        
-        Args:
-            generated_texts_list: 각 모델별 생성 텍스트 리스트들
-            reference_tokenizer: 기준 토크나이저
-            
-        Returns:
-            list: 앙상블 결과 텍스트 리스트
-        """
-        ensemble_results = []
-        num_samples = len(generated_texts_list[0])
-        
-        log.info("토큰 단위 하드 보팅 시작...")
-        
-        for i in tqdm(range(num_samples), desc="앙상블 처리 중"):
-            # 각 샘플에 대한 모든 모델의 예측 수집
-            texts_for_sample = [texts[i] for texts in generated_texts_list]
-            
-            # 빈 문자열 제거
-            texts_for_sample = [text for text in texts_for_sample if text.strip()]
-            
-            if not texts_for_sample:
-                ensemble_results.append("")
-                continue
-            
-            # 토큰화
-            tokenized_texts = []
-            for text in texts_for_sample:
-                try:
-                    tokens = reference_tokenizer.tokenize(text)
-                    tokenized_texts.append(tokens)
-                except:
-                    # 토큰화 실패 시 빈 리스트
-                    tokenized_texts.append([])
-            
-            # 빈 토큰 리스트 제거
-            tokenized_texts = [tokens for tokens in tokenized_texts if tokens]
-            
-            if not tokenized_texts:
-                ensemble_results.append("")
-                continue
-            
-            # 최대 길이에 맞춰 정렬
-            max_len = max(len(tokens) for tokens in tokenized_texts)
-            
-            # 각 위치별로 다수결
-            final_tokens = []
-            for pos in range(max_len):
-                tokens_at_pos = []
-                for tokens in tokenized_texts:
-                    if pos < len(tokens):
-                        tokens_at_pos.append(tokens[pos])
-                
-                if tokens_at_pos:
-                    # 가장 많이 선택된 토큰
-                    token_counts = Counter(tokens_at_pos)
+                if votes:
+                    # 가장 많이 나온 토큰 선택
+                    token_counts = Counter(votes)
                     most_common_token = token_counts.most_common(1)[0][0]
-                    final_tokens.append(most_common_token)
+                    ensemble_ids.append(most_common_token)
             
-            # 토큰을 텍스트로 변환
-            try:
-                final_text = reference_tokenizer.convert_tokens_to_string(final_tokens)
-                ensemble_results.append(final_text.strip())
-            except:
-                # 변환 실패 시 가장 첫 번째 텍스트 사용
-                ensemble_results.append(texts_for_sample[0])
-        
-        log.info("토큰 단위 하드 보팅 완료")
-        return ensemble_results
+            # 텍스트로 디코딩
+            ensemble_text = tokenizer.decode(ensemble_ids, skip_special_tokens=True)
+            for token in remove_tokens:
+                ensemble_text = ensemble_text.replace(token, " ")
+            
+            predictions.append(ensemble_text.strip())
+            
+        except Exception as e:
+            log.warning(f"하드보팅 샘플 {sample_idx} 처리 실패: {e}")
+            predictions.append("")
     
-    def length_based_ensemble(self, input_texts, config):
-        """
-        길이 기반 앙상블: 각 모델의 결과 중 가장 긴 것을 선택
-        
-        Args:
-            input_texts: 입력 텍스트 리스트
-            config: 설정 딕셔너리
+    # 디버깅: 예측 결과 확인
+    log.info(f"🔍 하드 보팅 예측 결과 샘플 (총 {len(predictions)}개):")
+    for i in range(min(3, len(predictions))):
+        log.info(f"  예측 {i+1}: '{predictions[i]}'")
+        log.info(f"  참조 {i+1}: '{reference_summaries[i]}'")
+    
+    # baseline.py 방식으로 ROUGE 계산
+    return convert_text_predictions_to_baseline_format(
+        predictions, reference_summaries, tokenizers[0], configs[0], "하드 보팅 앙상블"
+    )
+
+def evaluate_soft_voting(models: List, tokenizers: List, configs: List, val_data: pd.DataFrame) -> Dict[str, float]:
+    """소프트 보팅 앙상블 평가"""
+    log.info("🤝 소프트 보팅 앙상블 시작...")
+    
+    input_texts = val_data['dialogue'].tolist()
+    reference_summaries = val_data['summary'].tolist()
+    remove_tokens = configs[0]['inference']['remove_tokens']
+    tokenizer = tokenizers[0]
+    
+    predictions = []
+    
+    for text in tqdm(input_texts, desc="소프트 보팅 앙상블 처리"):
+        try:
+            # 각 모델의 beam search 결과들 수집
+            all_candidates = []
+            all_scores = []
             
-        Returns:
-            list: 앙상블 결과 텍스트 리스트
-        """
-        results = []
-        tokenizer = self.tokenizers[0]  # 기준 토크나이저
-        
-        log.info("길이 기반 앙상블 시작...")
-        
-        for text in tqdm(input_texts, desc="길이 기반 앙상블 처리 중"):
-            try:
-                # 입력 토크나이제이션
-                inputs = tokenizer(
+            for model, model_tokenizer, config in zip(models, tokenizers, configs):
+                inputs = model_tokenizer(
                     text,
                     return_tensors="pt",
                     max_length=config['tokenizer']['encoder_max_len'],
                     truncation=True,
                     padding=True
-                ).to(self.device)
+                ).to(model.device)
                 
-                # 각 모델의 결과를 직접 생성하여 길이 기반 선택
-                model_results = []
-                for model in self.models:
-                    with torch.no_grad():
-                        generated_ids = model.generate(
-                            input_ids=inputs['input_ids'],
-                            attention_mask=inputs['attention_mask'],
-                            max_length=config['inference']['generate_max_length'],
-                            num_beams=config['inference']['num_beams'],
-                            no_repeat_ngram_size=config['inference']['no_repeat_ngram_size'],
-                            early_stopping=config['inference']['early_stopping']
-                        )
-                        
-                        generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=False)
-                        
-                        # 불필요한 토큰 제거
-                        for token in config['inference']['remove_tokens']:
-                            generated_text = generated_text.replace(token, " ")
-                        
-                        model_results.append(generated_text.strip())
+                with torch.no_grad():
+                    outputs = model.generate(
+                        input_ids=inputs['input_ids'],
+                        attention_mask=inputs['attention_mask'],
+                        max_length=config['inference']['generate_max_length'],
+                        num_beams=config['inference']['num_beams'],
+                        no_repeat_ngram_size=config['inference']['no_repeat_ngram_size'],
+                        early_stopping=config['inference']['early_stopping'],
+                        return_dict_in_generate=True,
+                        output_scores=True,
+                        num_return_sequences=config['inference']['num_beams']
+                    )
                 
-                # 길이 기반 선택: 가장 긴 결과를 선택
-                if model_results:
-                    # 가장 긴 결과 선택
-                    longest_result = max(model_results, key=len)
-                    results.append(longest_result)
-                else:
-                    results.append("")
+                # 각 후보별로 텍스트와 점수 저장
+                for i, sequence in enumerate(outputs.sequences):
+                    text_output = model_tokenizer.decode(sequence, skip_special_tokens=True)
+                    for token in remove_tokens:
+                        text_output = text_output.replace(token, " ")
                     
-            except Exception as e:
-                log.warning(f"길이 기반 앙상블 중 오류 (fallback 사용): {e}")
-                results.append("")  # 빈 문자열로 fallback
-        
-        log.info("길이 기반 앙상블 완료")
-        return results
-    
-    def soft_voting_ensemble(self, input_texts, config):
-        """
-        진짜 소프트 보팅 앙상블: 모델들의 확률 분포를 평균하여 생성
-        
-        Args:
-            input_texts: 입력 텍스트 리스트
-            config: 설정 딕셔너리
+                    sequence_score = outputs.sequences_scores[i].item() if hasattr(outputs, 'sequences_scores') else 0.0
+                    
+                    all_candidates.append(text_output.strip())
+                    all_scores.append(sequence_score)
             
-        Returns:
-            list: 앙상블 결과 텍스트 리스트
-        """
-        results = []
-        tokenizer = self.tokenizers[0]  # 기준 토크나이저
-        
-        log.info("소프트 보팅 앙상블 시작...")
-        
-        for text in tqdm(input_texts, desc="소프트 보팅 앙상블 처리 중"):
-            try:
-                # 입력 토크나이제이션
-                inputs = tokenizer(
+            # 점수가 가장 높은 후보 선택
+            if all_candidates and all_scores:
+                best_idx = np.argmax(all_scores)
+                best_candidate = all_candidates[best_idx]
+                predictions.append(best_candidate)
+            else:
+                predictions.append("")
+                
+        except Exception as e:
+            log.warning(f"소프트 보팅 샘플 처리 실패: {e}")
+            predictions.append("")
+    
+    # baseline.py 방식으로 ROUGE 계산
+    return convert_text_predictions_to_baseline_format(
+        predictions, reference_summaries, tokenizers[0], configs[0], "소프트 보팅 앙상블"
+    )
+
+def evaluate_length_based(models: List, tokenizers: List, configs: List, val_data: pd.DataFrame) -> Dict[str, float]:
+    """길이 기반 앙상블 평가 (baseline.py 방식 사용)"""
+    log.info("📏 길이 기반 앙상블 시작...")
+    
+    input_texts = val_data['dialogue'].tolist()
+    reference_summaries = val_data['summary'].tolist()
+    
+    predictions_ids = []
+    labels_ids = []
+    
+    # 참조 답안을 토큰 ID로 변환
+    tokenizer = tokenizers[0]
+    for ref_text in reference_summaries:
+        ref_tokens = tokenizer(ref_text, return_tensors="pt", truncation=True, padding=False, max_length=512)
+        labels_ids.append(ref_tokens['input_ids'][0].tolist())
+    
+    for text in tqdm(input_texts, desc="길이 기반 앙상블 처리"):
+        try:
+            candidates_ids = []
+            
+            # 각 모델에서 생성
+            for model, model_tokenizer, config in zip(models, tokenizers, configs):
+                inputs = model_tokenizer(
                     text,
                     return_tensors="pt",
                     max_length=config['tokenizer']['encoder_max_len'],
                     truncation=True,
                     padding=True
-                ).to(self.device)
+                ).to(model.device)
                 
-                # 각 모델에서 beam search를 통해 여러 후보 생성
-                model_candidates = []
-                for model in self.models:
-                    with torch.no_grad():
-                        # beam search로 여러 후보 생성
-                        outputs = model.generate(
-                            input_ids=inputs['input_ids'],
-                            attention_mask=inputs['attention_mask'],
-                            max_length=config['inference']['generate_max_length'],
-                            num_beams=config['inference']['num_beams'],
-                            num_return_sequences=min(3, config['inference']['num_beams']),  # 최대 3개 후보
-                            return_dict_in_generate=True,
-                            output_scores=True,
-                            early_stopping=config['inference']['early_stopping']
-                        )
-                        
-                        # 각 후보와 그 점수를 저장
-                        candidates = []
-                        for i, sequence in enumerate(outputs.sequences):
-                            text_output = tokenizer.decode(sequence, skip_special_tokens=False)
-                            
-                            # 불필요한 토큰 제거
-                            for token in config['inference']['remove_tokens']:
-                                text_output = text_output.replace(token, " ")
-                            
-                            text_output = text_output.strip()
-                            
-                            # 점수 계산 (길이로 정규화된 평균 점수)
-                            if hasattr(outputs, 'sequences_scores') and len(outputs.sequences_scores) > i:
-                                score = outputs.sequences_scores[i].item()
-                            else:
-                                # sequences_scores가 없으면 길이 기반 점수 사용
-                                score = len(text_output.split()) / config['inference']['generate_max_length']
-                            
-                            candidates.append((text_output, score))
-                        
-                        model_candidates.append(candidates)
+                with torch.no_grad():
+                    output_ids = model.generate(
+                        input_ids=inputs['input_ids'],
+                        attention_mask=inputs['attention_mask'],
+                        max_length=config['inference']['generate_max_length'],
+                        num_beams=config['inference']['num_beams'],
+                        no_repeat_ngram_size=config['inference']['no_repeat_ngram_size'],
+                        early_stopping=config['inference']['early_stopping']
+                    )
                 
-                # 소프트 보팅: 각 모델의 최고 점수 후보들 중에서 평균 점수가 가장 높은 것 선택
-                all_candidates = []
-                
-                # 각 모델의 모든 후보를 수집
-                for model_idx, candidates in enumerate(model_candidates):
-                    for text_output, score in candidates:
-                        all_candidates.append((text_output, score, model_idx))
-                
-                if all_candidates:
-                    # 동일한 텍스트에 대해 점수 평균 계산
-                    text_scores = {}
-                    text_counts = {}
-                    
-                    for text_output, score, model_idx in all_candidates:
-                        if text_output not in text_scores:
-                            text_scores[text_output] = 0
-                            text_counts[text_output] = 0
-                        text_scores[text_output] += score
-                        text_counts[text_output] += 1
-                    
-                    # 평균 점수 계산
-                    for text_output in text_scores:
-                        text_scores[text_output] /= text_counts[text_output]
-                    
-                    # 가장 높은 평균 점수를 가진 텍스트 선택
-                    best_text = max(text_scores.keys(), key=lambda x: text_scores[x])
-                    results.append(best_text)
-                else:
-                    results.append("")
-                    
-            except Exception as e:
-                log.warning(f"소프트 보팅 앙상블 중 오류 (fallback 사용): {e}")
-                results.append("")  # 빈 문자열로 fallback
-        
-        log.info("소프트 보팅 앙상블 완료")
-        return results
-    
-    def logit_level_ensemble(self, input_texts, config):
-        """
-        최적화된 Logit 레벨 앙상블: Nucleus Sampling과 Beam Search 적용
-        
-        Args:
-            input_texts: 입력 텍스트 리스트
-            config: 설정 딕셔너리
+                generated_ids = output_ids[0].tolist()
+                candidates_ids.append(generated_ids)
             
-        Returns:
-            list: 앙상블 결과 텍스트 리스트
-        """
-        return self.optimized_beam_search_ensemble(
-            input_texts, 
-            config,
-            temperature=1.0,
-            top_k=0,
-            top_p=1.0,  # Nucleus Sampling 비활성화 - test_293 NaN 문제 해결
-            repetition_penalty=1.0
-        )
+            # 가장 긴 결과 선택 (토큰 수 기준)
+            if candidates_ids:
+                longest_candidate = max(candidates_ids, key=len)
+                predictions_ids.append(longest_candidate)
+            else:
+                predictions_ids.append([tokenizer.pad_token_id])
+                
+        except Exception as e:
+            log.warning(f"길이 기반 앙상블 샘플 처리 실패: {e}")
+            predictions_ids.append([tokenizer.pad_token_id])
     
-    def optimized_beam_search_ensemble(self, input_texts, config, 
-                                    temperature=1.0, 
-                                    top_k=0, 
-                                    top_p=0.9,
-                                    repetition_penalty=1.0):
-        """
-        최적화된 Beam Search 앙상블 (Nucleus Sampling 적용)
-        
-        Args:
-            input_texts: 입력 텍스트 리스트
-            config: 설정 딕셔너리
-            temperature: 온도 파라미터
-            top_k: Top-K 필터링
-            top_p: Nucleus sampling
-            repetition_penalty: 반복 페널티
+    # baseline.py의 compute_metrics 사용하여 ROUGE 계산
+    rouge_scores = calculate_rouge_scores_with_baseline(
+        predictions_ids, labels_ids, tokenizer, configs[0], "길이 기반 앙상블"
+    )
+    return rouge_scores
+
+def evaluate_logit_level(models: List, tokenizers: List, configs: List, val_data: pd.DataFrame) -> Dict[str, float]:
+    """Logit 레벨 앙상블 평가 (최적화된 Beam Search + Nucleus Sampling)"""
+    log.info("🎯 Logit 레벨 앙상블 시작...")
+    
+    input_texts = val_data['dialogue'].tolist()
+    reference_summaries = val_data['summary'].tolist()
+    remove_tokens = configs[0]['inference']['remove_tokens']
+    tokenizer = tokenizers[0]
+    config = configs[0]
+    max_length = config['inference']['generate_max_length']
+    num_beams = config['inference']['num_beams']
+    device = models[0].device
+    
+    # Nucleus Sampling 파라미터 추가
+    top_p = 1.0  # ensemble_inference_best.py와 동일하게 설정 (Nucleus Sampling 비활성화)
+    
+    predictions = []
+    
+    for idx, text in enumerate(tqdm(input_texts, desc="Logit 레벨 앙상블 처리")):
+        try:
+            # 입력 토큰화
+            inputs = tokenizer(
+                text,
+                return_tensors="pt",
+                max_length=config['tokenizer']['encoder_max_len'],
+                truncation=True,
+                padding=True
+            ).to(device)
             
-        Returns:
-            list: 생성된 텍스트 리스트
-        """
-        results = []
-        tokenizer = self.tokenizers[0]
-        max_length = config['inference']['generate_max_length']
-        num_beams = config['inference']['num_beams']
-        
-        log.info(f"최적화된 Logit 앙상블 시작: top_p={top_p}, num_beams={num_beams}")
-        
-        for idx, text in enumerate(tqdm(input_texts, desc="최적화된 Logit 앙상블 처리 중")):
-            try:
-                # 디버깅: 현재 처리 중인 샘플 로그  
-                log.info(f"🔍 [DEBUG] 샘플 {idx} 처리 시작")
-                log.info(f"🔍 [DEBUG] 입력 텍스트 길이: {len(text)}")
-                log.info(f"🔍 [DEBUG] 입력 텍스트 앞 100자: {text[:100]}")
+            # 각 모델의 encoder 출력 미리 계산
+            encoder_outputs_list = []
+            for model in models:
+                with torch.no_grad():
+                    encoder_outputs = model.get_encoder()(
+                        input_ids=inputs['input_ids'],
+                        attention_mask=inputs['attention_mask']
+                    )
+                    encoder_outputs_list.append(encoder_outputs.last_hidden_state.clone().detach())
+            
+            # Beam Search 초기화
+            decoder_start_token_id = tokenizer.bos_token_id
+            if decoder_start_token_id is None:
+                decoder_start_token_id = tokenizer.eos_token_id
+            batch_size = 1
+            beam_size = num_beams
+            
+            sequences = torch.full((batch_size * beam_size, 1), decoder_start_token_id, device=device)
+            beam_scores = torch.zeros(batch_size * beam_size, device=device)
+            beam_scores[1:] = -float('inf')
+            
+            eos_token_id = tokenizer.eos_token_id
+            finished_sequences = []
+            
+            # Beam Search 루프
+            for step in range(max_length - 1):
+                if len(finished_sequences) >= beam_size:
+                    break
                 
-                # 입력 토큰화
-                inputs = tokenizer(
-                    text,
-                    return_tensors="pt",
-                    max_length=config['tokenizer']['encoder_max_len'],
-                    truncation=True,
-                    padding=True
-                ).to(self.device)
+                current_sequences = sequences[beam_scores > -float('inf')]
+                current_scores = beam_scores[beam_scores > -float('inf')]
                 
-                log.info(f"🔍 [DEBUG] 샘플 {idx} 토큰화 성공: input_ids shape={inputs['input_ids'].shape}")
+                if len(current_sequences) == 0:
+                    break
                 
-                # 각 모델의 encoder 출력 미리 계산 (깊은 복사로 독립성 보장)
-                encoder_outputs_list = []
-                for model_idx, model in enumerate(self.models):
-                    with torch.no_grad():
-                        encoder_outputs = model.get_encoder()(
-                            input_ids=inputs['input_ids'],
-                            attention_mask=inputs['attention_mask']
-                        )
-                        # 깊은 복사로 독립성 보장
-                        encoder_outputs_copy = encoder_outputs.last_hidden_state.clone().detach()
-                        encoder_outputs_list.append(encoder_outputs_copy)
-                        
-                        log.info(f"🔍 [DEBUG] 샘플 {idx} 모델 {model_idx+1} encoder 출력 shape: {encoder_outputs_copy.shape}")
-                        
-                        # 메모리 정리
-                        del encoder_outputs
-                
-                # Beam Search 초기화
-                decoder_start_token_id = tokenizer.bos_token_id
-                if decoder_start_token_id is None:
-                    decoder_start_token_id = tokenizer.eos_token_id
-                
-                batch_size = 1
-                beam_size = num_beams
-                
-                sequences = torch.full((batch_size * beam_size, 1), decoder_start_token_id, device=self.device)
-                beam_scores = torch.zeros(batch_size * beam_size, device=self.device)
-                beam_scores[1:] = -float('inf')
-                
-                eos_token_id = tokenizer.eos_token_id
-                finished_sequences = []
-                
-                # Beam Search 루프 (Nucleus Sampling 적용)
-                log.info(f"🔍 [DEBUG] 샘플 {idx} Beam Search 시작 - max_length: {max_length}, num_beams: {num_beams}")
-                log.info(f"🔍 [DEBUG] 샘플 {idx} decoder_start_token_id: {decoder_start_token_id}, eos_token_id: {eos_token_id}")
-                
-                for step in range(max_length - 1):
-                    if step % 10 == 0 or step < 5:  # 처음 5단계와 10단계마다 로깅
-                        log.info(f"🔍 [DEBUG] 샘플 {idx} step {step}: finished_sequences={len(finished_sequences)}, beam_size={beam_size}")
-                    
-                    if len(finished_sequences) >= beam_size:
-                        log.info(f"🔍 [DEBUG] 샘플 {idx} step {step}: 충분한 finished_sequences로 조기 종료")
-                        break
-                    
-                    current_sequences = sequences[beam_scores > -float('inf')]
-                    current_scores = beam_scores[beam_scores > -float('inf')]
-                    
-                    if len(current_sequences) == 0:
-                        log.info(f"🔍 [DEBUG] 샘플 {idx} step {step}: current_sequences가 비어서 종료")
-                        break
-                    
-                    # 각 모델에서 logits 계산
-                    all_next_logits = []
-                    
-                    for model_idx, model in enumerate(self.models):
+                # 각 모델에서 logits 계산
+                all_next_logits = []
+                for model_idx, model in enumerate(models):
+                    try:
                         with torch.no_grad():
                             decoder_outputs = model.get_decoder()(
                                 input_ids=current_sequences,
@@ -1693,831 +908,491 @@ class PostProcessingEnsemble:
                             logits = model.lm_head(decoder_outputs.last_hidden_state)
                             next_token_logits = logits[:, -1, :]
                             all_next_logits.append(next_token_logits)
-                    
-                    # 모든 모델의 logits 평균
-                    ensemble_logits = torch.stack(all_next_logits).mean(dim=0)
-                    
-                    # === Nucleus Sampling 적용 ===
-                    if top_p < 1.0:
-                        for beam_idx in range(ensemble_logits.size(0)):
-                            sorted_logits, sorted_indices = torch.sort(ensemble_logits[beam_idx], descending=True)
-                            sorted_probs = torch.softmax(sorted_logits, dim=-1)
-                            cumulative_probs = torch.cumsum(sorted_probs, dim=-1)
-                            
-                            # nucleus 밖의 토큰들 제거
-                            sorted_indices_to_remove = cumulative_probs > top_p
-                            sorted_indices_to_remove[1:] = sorted_indices_to_remove[:-1].clone()
-                            sorted_indices_to_remove[0] = 0
-                            
-                            indices_to_remove = sorted_indices[sorted_indices_to_remove]
-                            
-                            # 디버깅: nucleus sampling 상태 로깅
-                            if step < 5:  # 처음 5 스텝만 로깅
-                                log.info(f"🔍 [NUCLEUS] 샘플 {idx} step {step} beam {beam_idx}")
-                                log.info(f"🔍 [NUCLEUS] 원본 logits 범위: [{ensemble_logits[beam_idx].min():.3f}, {ensemble_logits[beam_idx].max():.3f}]")
-                                log.info(f"🔍 [NUCLEUS] top 5 logits: {sorted_logits[:5].tolist()}")
-                                log.info(f"🔍 [NUCLEUS] top 5 probs: {sorted_probs[:5].tolist()}")
-                                log.info(f"🔍 [NUCLEUS] cumulative_probs[:10]: {cumulative_probs[:10].tolist()}")
-                                log.info(f"🔍 [NUCLEUS] 제거할 토큰 수: {len(indices_to_remove)}")
-                                log.info(f"🔍 [NUCLEUS] 남은 토큰 수: {(ensemble_logits[beam_idx] > -float('inf')).sum().item()}")
-                            
-                            ensemble_logits[beam_idx, indices_to_remove] = -float('inf')
-                            
-                            # 추가 체크: 모든 토큰이 제거되었는지 확인
-                            valid_tokens = (ensemble_logits[beam_idx] > -float('inf')).sum().item()
-                            if valid_tokens == 0:
-                                log.error(f"🚨 [NUCLEUS] 샘플 {idx} step {step} beam {beam_idx}: 모든 토큰이 제거됨!")
-                                # 응급처치: 최고 확률 토큰 하나는 유지
-                                best_token_idx = torch.argmax(sorted_logits)
-                                ensemble_logits[beam_idx, sorted_indices[best_token_idx]] = sorted_logits[best_token_idx]
-                    
-                    # Log probabilities 계산
-                    next_token_log_probs = torch.log_softmax(ensemble_logits, dim=-1)
-                    
-                    # 새로운 beam 후보 생성
-                    vocab_size = next_token_log_probs.size(-1)
-                    next_scores = current_scores.unsqueeze(1) + next_token_log_probs
-                    next_scores = next_scores.view(-1)
-                    
-                    # Top-k 선택
-                    top_scores, top_indices = torch.topk(next_scores, min(beam_size * 2, len(next_scores)))
-                    
-                    # 새 beam 구성
-                    new_sequences = []
-                    new_scores = []
-                    
-                    for score, token_idx in zip(top_scores, top_indices):
-                        beam_idx = token_idx // vocab_size
-                        token_id = token_idx % vocab_size
+                    except Exception as e:
+                        log.warning(f"모델 {model_idx} 스텝 {step} 처리 실패: {e}")
+                        continue
+                
+                # 모든 모델이 실패한 경우 처리
+                if not all_next_logits:
+                    log.warning(f"샘플 {idx}: 모든 모델이 실패, 빈 문자열 반환")
+                    predictions.append("")
+                    break
+                
+                # 모든 모델의 logits 평균
+                ensemble_logits = torch.stack(all_next_logits).mean(dim=0)
+                
+                # Nucleus Sampling (Top-p) 적용
+                if top_p < 1.0:
+                    for beam_idx in range(ensemble_logits.size(0)):
+                        sorted_logits, sorted_indices = torch.sort(ensemble_logits[beam_idx], descending=True)
+                        sorted_probs = torch.softmax(sorted_logits, dim=-1)
+                        cumulative_probs = torch.cumsum(sorted_probs, dim=-1)
                         
-                        new_seq = torch.cat([
-                            current_sequences[beam_idx],
-                            torch.tensor([token_id], device=self.device)
-                        ])
+                        # 누적 확률이 top_p를 초과하는 토큰들 제거
+                        sorted_indices_to_remove = cumulative_probs > top_p
+                        sorted_indices_to_remove[1:] = sorted_indices_to_remove[:-1].clone()
+                        sorted_indices_to_remove[0] = 0
                         
-                        # EOS 토큰 체크
-                        if token_id == eos_token_id:
-                            finished_sequences.append((new_seq, score.item()))
-                        else:
-                            new_sequences.append(new_seq)
-                            new_scores.append(score)
-                            
-                        if len(new_sequences) >= beam_size:
-                            break
+                        indices_to_remove = sorted_indices[sorted_indices_to_remove]
+                        ensemble_logits[beam_idx, indices_to_remove] = -float('inf')
+                        
+                        # 모든 토큰이 제거된 경우 응급처치 (best.py와 동일)
+                        valid_tokens = (ensemble_logits[beam_idx] > -float('inf')).sum().item()
+                        if valid_tokens == 0:
+                            # 최고 확률 토큰 하나는 유지
+                            best_token_idx = torch.argmax(sorted_logits)
+                            ensemble_logits[beam_idx, sorted_indices[best_token_idx]] = sorted_logits[best_token_idx]
+                
+                # Log probabilities 계산
+                next_token_log_probs = torch.log_softmax(ensemble_logits, dim=-1)
+                
+                # 새로운 beam 후보 생성
+                vocab_size = next_token_log_probs.size(-1)
+                next_scores = current_scores.unsqueeze(1) + next_token_log_probs
+                next_scores = next_scores.view(-1)
+                
+                # Top-k 선택
+                top_scores, top_indices = torch.topk(next_scores, min(beam_size * 2, len(next_scores)))
+                
+                # 새 beam 구성
+                new_sequences = []
+                new_scores = []
+                
+                for score, token_idx in zip(top_scores, top_indices):
+                    beam_idx = token_idx // vocab_size
+                    token_id = token_idx % vocab_size
                     
-                    if not new_sequences:
-                        break
+                    new_seq = torch.cat([
+                        current_sequences[beam_idx],
+                        torch.tensor([token_id], device=device)
+                    ])
                     
-                    # 다음 단계를 위한 업데이트
-                    max_len = max(len(seq) for seq in new_sequences)
-                    sequences = torch.full((beam_size, max_len), tokenizer.pad_token_id, device=self.device)
-                    beam_scores = torch.full((beam_size,), -float('inf'), device=self.device)
-                    
-                    for i, (seq, score) in enumerate(zip(new_sequences[:beam_size], new_scores[:beam_size])):
-                        sequences[i, :len(seq)] = seq
-                        beam_scores[i] = score
-                
-                # Beam Search 완료 후 로깅
-                log.info(f"🔍 [DEBUG] 샘플 {idx} Beam Search 완료 - finished_sequences: {len(finished_sequences)}")
-                log.info(f"🔍 [DEBUG] 샘플 {idx} beam_scores 유효 개수: {torch.sum(beam_scores > -float('inf')).item()}")
-                
-                # 최고 점수 시퀀스 선택
-                if finished_sequences:
-                    log.info(f"🔍 [DEBUG] 샘플 {idx} finished_sequences 선택 시작: {len(finished_sequences)}개 후보")
-                    for i, (seq, score) in enumerate(finished_sequences[:3]):  # 상위 3개만 로그
-                        seq_preview = seq.tolist()[:15] if len(seq) > 15 else seq.tolist()
-                        log.info(f"🔍 [DEBUG] 샘플 {idx} finished_seq[{i}]: {seq_preview} (score: {score})")
-                    
-                    best_sequence, best_score = max(finished_sequences, key=lambda x: x[1])
-                    
-                    log.info(f"🔍 [DEBUG] 샘플 {idx} 선택된 best_score: {best_score}")
-                    log.info(f"🔍 [DEBUG] 샘플 {idx} 선택된 best_sequence: {best_sequence.tolist()}")
-                else:
-                    log.info(f"🔍 [DEBUG] 샘플 {idx} finished_sequences가 비어서 beam_scores에서 선택")
-                    log.info(f"🔍 [DEBUG] 샘플 {idx} beam_scores: {beam_scores.tolist()}")
-                    log.info(f"🔍 [DEBUG] 샘플 {idx} sequences shape: {sequences.shape}")
-                    
-                    best_idx = torch.argmax(beam_scores)
-                    best_sequence = sequences[best_idx]
-                    
-                    log.info(f"🔍 [DEBUG] 샘플 {idx} 선택된 best_idx: {best_idx}")
-                    log.info(f"🔍 [DEBUG] 샘플 {idx} 선택된 best_sequence: {best_sequence.tolist()}")
-                
-                log.info(f"🔍 [DEBUG] 샘플 {idx} best_sequence shape: {best_sequence.shape}")
-                log.info(f"🔍 [DEBUG] 샘플 {idx} best_sequence 실제 내용: {best_sequence}")
-                log.info(f"🔍 [DEBUG] 샘플 {idx} best_sequence가 비어있는가? {len(best_sequence) == 0}")
-                
-                # CRITICAL: best_sequence가 비어있거나 문제가 있는 경우 fallback 처리
-                if len(best_sequence) == 0 or best_sequence.dim() == 0:
-                    log.error(f"🚨 [CRITICAL] 샘플 {idx} best_sequence가 비어있음! fallback 처리")
-                    results.append("")
-                    continue
-                
-                # 텍스트로 디코딩 (baseline.py와 동일하게 특수 토큰 유지)
-                generated_text = tokenizer.decode(best_sequence, skip_special_tokens=False)
-                
-                log.info(f"🔍 [DEBUG] 샘플 {idx} 디코딩 결과: '{generated_text}'")
-                log.info(f"🔍 [DEBUG] 샘플 {idx} best_sequence 내용: {best_sequence.tolist()}")
-                log.info(f"🔍 [DEBUG] 샘플 {idx} best_sequence 길이: {len(best_sequence)}")
-                
-                # 불필요한 토큰 제거
-                original_text = generated_text
-                for token in config['inference']['remove_tokens']:
-                    generated_text = generated_text.replace(token, " ")
-                
-                log.info(f"🔍 [DEBUG] 샘플 {idx} 토큰 제거 전: '{original_text}'")
-                log.info(f"🔍 [DEBUG] 샘플 {idx} 토큰 제거 후: '{generated_text}'")
-                log.info(f"🔍 [DEBUG] 샘플 {idx} 최종 결과: '{generated_text.strip()}'")
-                
-                results.append(generated_text.strip())
-                
-            except Exception as e:
-                # 예외 발생 시 상세 로그
-                log.error(f"🚨 [ERROR] 샘플 {idx} 처리 중 예외 발생!")
-                log.error(f"🚨 [ERROR] 예외 유형: {type(e).__name__}")
-                log.error(f"🚨 [ERROR] 예외 메시지: {str(e)}")
-                import traceback
-                log.error(f"🚨 [ERROR] 상세 스택 트레이스:\n{traceback.format_exc()}")
-                
-                log.warning(f"최적화된 Logit 앙상블 오류 (샘플 {idx}): {e}")
-                # Fallback: 첫 번째 모델의 beam search 결과 사용
-                try:
-                    log.info(f"🔄 [FALLBACK] 샘플 {idx} fallback 시도: 첫 번째 모델 단독 생성")
-                    with torch.no_grad():
-                        output_ids = self.models[0].generate(
-                            input_ids=inputs['input_ids'],
-                            attention_mask=inputs['attention_mask'],
-                            max_length=config['inference']['generate_max_length'],
-                            num_beams=config['inference']['num_beams'],
-                            no_repeat_ngram_size=config['inference']['no_repeat_ngram_size'],
-                            early_stopping=config['inference']['early_stopping']
-                        )
-                    fallback_text = tokenizer.decode(output_ids[0], skip_special_tokens=False)
-                    for token in config['inference']['remove_tokens']:
-                        fallback_text = fallback_text.replace(token, " ")
-                    
-                    log.info(f"🔄 [FALLBACK] 샘플 {idx} fallback 성공: '{fallback_text.strip()}'")
-                    results.append(fallback_text.strip())
-                except Exception as fallback_e:
-                    log.error(f"🚨 [FALLBACK ERROR] 샘플 {idx} fallback도 실패: {fallback_e}")
-                    log.error(f"🚨 [FALLBACK ERROR] 빈 문자열로 대체")
-                    results.append("")  # 빈 문자열로 fallback
-        
-        log.info("최적화된 Logit 앙상블 완료")
-        return results
-    
-    def evaluate_on_validation(self, val_data_path):
-        """
-        검증 데이터로 앙상블 및 개별 모델 성능 평가
-        
-        Args:
-            val_data_path: 검증 데이터 경로
-            
-        Returns:
-            dict: 평가 결과 (개별 모델 점수, 앙상블 점수)
-        """
-        log.info(f"검증 데이터 평가 시작: {val_data_path}")
-        
-        # 검증 데이터 로드 (빠른 테스트를 위해 일부만 사용)
-        val_df = pd.read_csv(val_data_path)
-        # 빠른 테스트를 위해 처음 50개만 사용
-        val_df = val_df.head(50)
-        input_texts = val_df['dialogue'].tolist()
-        reference_summaries = val_df['summary'].tolist()
-        log.info(f"검증 데이터 로드 완룼: {len(input_texts)}개 샘플 (빠른 테스트용)")
-        
-        # 각 모델별로 독립적으로 생성
-        all_generated_texts = []
-        individual_scores = []
-        
-        for i, (model, tokenizer, config) in enumerate(zip(self.models, self.tokenizers, self.configs)):
-            log.info(f"모델 {i+1}/{len(self.models)} 검증 점수 계산 시작 (baseline.py 방식)...")
-            
-            # baseline.py 방식으로 정확한 검증 점수 계산
-            rouge_scores = evaluate_single_model_with_baseline(model, tokenizer, config)
-            individual_scores.append({
-                'model_index': i + 1,
-                'model_metadata': self.metadata_list[i],
-                'rouge_scores': rouge_scores
-            })
-            
-            log.info(f"모델 {i+1} 검증 점수 (baseline.py 방식) - ROUGE-1: {rouge_scores['rouge-1']:.6f}, "
-                    f"ROUGE-2: {rouge_scores['rouge-2']:.6f}, ROUGE-L: {rouge_scores['rouge-l']:.6f}")
-            
-            # 앙상블용 토큰 ID 추론 데이터 준비 (토큰 레벨 앙상블을 위함)
-            generated_token_ids = self.generate_token_ids_with_single_model(model, tokenizer, config, input_texts)
-            all_generated_texts.append(generated_token_ids)
-        
-        # 세 가지 앙상블 방식 모두 테스트
-        log.info("\n=== 토큰 ID 레벨 하드 보팅 vs 소프트 보팅 vs 길이 기반 비교 ===")
-        
-        # 1. 토큰 ID 레벨 하드 보팅 앙상블
-        log.info("토큰 ID 레벨 하드 보팅 앙상블 시작...")
-        hard_voting_results = self.token_id_level_hard_voting(all_generated_texts, self.tokenizers[0])
-        
-        # 2. 소프트 보팅 앙상블
-        log.info("소프트 보팅 앙상블 시작...")
-        soft_voting_results = self.soft_voting_ensemble(input_texts, self.configs[0])
-        
-        # 3. 길이 기반 앙상블
-        log.info("길이 기반 앙상블 시작...")
-        length_based_results = self.length_based_ensemble(input_texts, self.configs[0])
-        
-        # 4. Logit 레벨 앙상블
-        log.info("Logit 레벨 앙상블 시작...")
-        logit_level_results = self.logit_level_ensemble(input_texts, self.configs[0])
-        
-        # ROUGE 계산 함수 정의 (baseline.py와 동일한 방식으로 수정)
-        def calculate_rouge_scores(predictions, references, method_name):
-            from rouge import Rouge
-            rouge = Rouge()
-            
-            # baseline.py와 동일한 방식으로 토큰 제거 (정확한 평가를 위해)
-            replaced_predictions = predictions.copy()
-            replaced_references = references.copy()
-            remove_tokens = self.configs[0]['inference']['remove_tokens']
-            for token in remove_tokens:
-                replaced_predictions = [sentence.replace(token, " ") for sentence in replaced_predictions]
-                replaced_references = [sentence.replace(token, " ") for sentence in replaced_references]
-            
-            # baseline.py와 동일한 방식으로 정규화
-            cleaned_predictions = []
-            cleaned_references = []
-            for pred, ref in zip(replaced_predictions, replaced_references):
-                # 공백 정리 (baseline.py의 clean_up_tokenization_spaces=True 효과 모방)
-                pred_clean = " ".join(pred.split()).strip()
-                ref_clean = " ".join(ref.split()).strip()
-                    
-                cleaned_predictions.append(pred_clean)
-                cleaned_references.append(ref_clean)
-            
-            try:
-                # 빈 문자열이 있으면 rouge 계산 실패할 수 있으므로 처리
-                final_predictions = []
-                final_references = []
-                for pred, ref in zip(cleaned_predictions, cleaned_references):
-                    if pred.strip() and ref.strip():
-                        final_predictions.append(pred)
-                        final_references.append(ref)
+                    # EOS 토큰 체크
+                    if token_id == eos_token_id:
+                        finished_sequences.append((new_seq, score.item()))
                     else:
-                        # 빈 문자열인 경우 "empty"로 대체
-                        final_predictions.append("empty" if not pred.strip() else pred)
-                        final_references.append("empty" if not ref.strip() else ref)
+                        new_sequences.append(new_seq)
+                        new_scores.append(score)
+                        
+                    if len(new_sequences) >= beam_size:
+                        break
                 
-                rouge_results = rouge.get_scores(final_predictions, final_references, avg=True)
-                rouge_scores = {key: value["f"] for key, value in rouge_results.items()}
-                # rouge-avg 계산 추가
-                rouge_avg = (rouge_scores['rouge-1'] + rouge_scores['rouge-2'] + rouge_scores['rouge-l']) / 3
-                rouge_scores['rouge-avg'] = rouge_avg
+                if not new_sequences:
+                    break
                 
-                log.info(f"{method_name} 검증 점수 - ROUGE-1: {rouge_scores['rouge-1']:.4f}, "
-                        f"ROUGE-2: {rouge_scores['rouge-2']:.4f}, ROUGE-L: {rouge_scores['rouge-l']:.4f}, "
-                        f"ROUGE-avg: {rouge_scores['rouge-avg']:.4f}")
-                return rouge_scores
-            except Exception as e:
-                log.warning(f"{method_name} ROUGE 계산 오류: {e}")
-                return {'rouge-1': 0.0, 'rouge-2': 0.0, 'rouge-l': 0.0, 'rouge-avg': 0.0}
-        
-        # 3. 네 방식의 ROUGE 점수 계산
-        hard_voting_scores = calculate_rouge_scores(hard_voting_results, reference_summaries, "하드 보팅")
-        soft_voting_scores = calculate_rouge_scores(soft_voting_results, reference_summaries, "소프트 보팅")
-        length_based_scores = calculate_rouge_scores(length_based_results, reference_summaries, "길이 기반")
-        logit_level_scores = calculate_rouge_scores(logit_level_results, reference_summaries, "Logit 레벨")
-        
-        # 4. 비교 결과 출력
-        log.info("\n=== 앙상블 방식 비교 결과 ===")
-        log.info(f"하드 보팅 ROUGE-avg: {hard_voting_scores['rouge-avg']:.4f}")
-        log.info(f"소프트 보팅 ROUGE-avg: {soft_voting_scores['rouge-avg']:.4f}")
-        log.info(f"길이 기반 ROUGE-avg: {length_based_scores['rouge-avg']:.4f}")
-        log.info(f"Logit 레벨 ROUGE-avg: {logit_level_scores['rouge-avg']:.4f}")
-        
-        # 가장 나은 방식 선택
-        all_scores = {
-            "하드 보팅": (hard_voting_scores, hard_voting_results),
-            "소프트 보팅": (soft_voting_scores, soft_voting_results),
-            "길이 기반": (length_based_scores, length_based_results),
-            "Logit 레벨": (logit_level_scores, logit_level_results)
-        }
-        
-        best_method = max(all_scores.keys(), key=lambda x: all_scores[x][0]['rouge-avg'])
-        ensemble_rouge_scores = all_scores[best_method][0]
-        
-        log.info(f"{best_method}이 가장 나은 성능을 보입니다!")
-        
-        evaluation_results = {
-            'individual_model_scores': individual_scores,
-            'hard_voting_scores': hard_voting_scores,
-            'soft_voting_scores': soft_voting_scores,
-            'length_based_scores': length_based_scores,
-            'logit_level_scores': logit_level_scores,
-            'ensemble_scores': ensemble_rouge_scores,
-            'best_ensemble_method': best_method,
-            'num_validation_samples': len(input_texts)
-        }
-        
-        log.info("검증 데이터 평가 완료 (baseline.py 방식 사용)")
-        return evaluation_results
-    
-    def run_ensemble(self, test_data_path):
-        """
-        하드 보팅 앙상블 실행
-        
-        Args:
-            test_data_path: 테스트 데이터 경로
-            
-        Returns:
-            tuple: (ensemble_result_df, individual_results_list)
-        """
-        log.info(f"앙상블 추론 시작: {test_data_path}")
-        
-        # 테스트 데이터 로드 (빠른 테스트를 위해 일부만 사용)
-        test_df = pd.read_csv(test_data_path)
-        # 빠른 테스트를 위해 처음 20개만 사용
-        test_df = test_df.head(20)
-        input_texts = test_df['dialogue'].tolist()
-        log.info(f"테스트 데이터 로드 완룼: {len(input_texts)}개 샘플 (빠른 테스트용)")
-        
-        # 개별 모델들로 추론 수행
-        all_generated_texts = []
-        
-        for i, (model, tokenizer, config) in enumerate(zip(self.models, self.tokenizers, self.configs)):
-            log.info(f"모델 {i+1}/{len(self.models)} 추론 시작...")
-            log.info(f"모델 설정 - max_length: {config['inference']['generate_max_length']}, "
-                    f"num_beams: {config['inference']['num_beams']}")
-            
-            generated_texts = self.generate_with_single_model(model, tokenizer, config, input_texts)
-            all_generated_texts.append(generated_texts)
-            
-            log.info(f"모델 {i+1} 추론 완료")
-        
-        # 세 가지 앙상블 방식 모두 수행
-        log.info("\n=== 하드 보팅 vs 소프트 보팅 vs 길이 기반 앙상블 수행 ===")
-        
-        # 1. 하드 보팅 앙상블
-        log.info("하드 보팅 앙상블 시작...")
-        hard_voting_results = self.token_level_hard_voting(all_generated_texts, self.tokenizers[0])
-        
-        # 2. 소프트 보팅 앙상블
-        log.info("소프트 보팅 앙상블 시작...")
-        soft_voting_results = self.soft_voting_ensemble(input_texts, self.configs[0])
-        
-        # 3. 길이 기반 앙상블
-        log.info("길이 기반 앙상블 시작...")
-        length_based_results = self.length_based_ensemble(input_texts, self.configs[0])
-        
-        # 4. Logit 레벨 앙상블
-        log.info("Logit 레벨 앙상블 시작...")
-        logit_level_results = self.logit_level_ensemble(input_texts, self.configs[0])
-        
-        # 5. 네 방식의 결과 데이터프레임 생성
-        hard_voting_df = pd.DataFrame({
-            'fname': test_df['fname'],
-            'summary': hard_voting_results
-        })
-        
-        soft_voting_df = pd.DataFrame({
-            'fname': test_df['fname'],
-            'summary': soft_voting_results
-        })
-        
-        length_based_df = pd.DataFrame({
-            'fname': test_df['fname'],
-            'summary': length_based_results
-        })
-        
-        logit_level_df = pd.DataFrame({
-            'fname': test_df['fname'],
-            'summary': logit_level_results
-        })
-        
-        log.info("앙상블 추론 완료 (하드 보팅 & 소프트 보팅 & 길이 기반 & Logit 레벨)")
-        
-        # 네 방식의 결과를 모두 반환
-        ensemble_results = {
-            'hard_voting': hard_voting_df,
-            'soft_voting': soft_voting_df,
-            'length_based': length_based_df,
-            'logit_level': logit_level_df,
-            'individual_results': all_generated_texts
-        }
-        
-        return ensemble_results, all_generated_texts
-    
-    def evaluate_individual_models(self, val_data_path):
-        """
-        baseline.py와 동일한 방식으로 개별 모델들을 평가합니다.
-        """
-        log.info("개별 모델 평가 시작 (baseline.py 방식)")
-        
-        # 이미 현재 파일에 있는 함수들을 사용
-        import pandas as pd
-        
-        try:
-            individual_scores = []
-            
-            for i, (model, tokenizer, config) in enumerate(zip(self.models, self.tokenizers, self.configs)):
-                log.info(f"모델 {i+1}/{len(self.models)} 평가 중...")
+                # 다음 단계를 위한 업데이트
+                max_len = max(len(seq) for seq in new_sequences)
+                sequences = torch.full((beam_size, max_len), tokenizer.pad_token_id, device=device)
+                beam_scores = torch.full((beam_size,), -float('inf'), device=device)
                 
-                # baseline.py와 동일한 방식으로 평가
-                eval_results = evaluate_single_model_with_baseline(model, tokenizer, config)
-                
-                individual_scores.append({
-                    'model_index': i + 1,
-                    'model_metadata': getattr(model, 'metadata', {}),
-                    'rouge_scores': eval_results
-                })
-                
-                log.info(f"모델 {i+1} 평가 완료: ROUGE-avg {eval_results['rouge-avg']:.4f}")
+                for i, (seq, score) in enumerate(zip(new_sequences[:beam_size], new_scores[:beam_size])):
+                    sequences[i, :len(seq)] = seq
+                    beam_scores[i] = score
             
-            return {'individual_model_scores': individual_scores}
-            
-        except Exception as e:
-            log.error(f"개별 모델 평가 실패: {e}")
-            return {'individual_model_scores': []}
-
-def run_single_method(method_name):
-    """
-    개별 앙상블 방식 실행 함수
-    
-    Args:
-        method_name: 실행할 방식 ('hard_voting', 'soft_voting', 'length_based', 'realtime_token')
-    """
-    log.info(f"🎯 개별 방식 실행: {method_name}")
-    
-    # 공통 함수로 모델 경로 가져오기
-    existing_model_paths = get_model_paths()
-    if not existing_model_paths:
-        return
-    
-    log.info(f"총 {len(existing_model_paths)}개 모델로 {method_name} 진행")
-    
-    # 디바이스 설정
-    device = "cuda:0" if torch.cuda.is_available() else "cpu"
-    
-    # 실시간 토큰 앙상블 방식
-    if method_name == "realtime_token":
-        ensemble = RealtimeTokenEnsemble(existing_model_paths, device=device)
-        ensemble.load_models()
-        
-        # 검증 데이터 평가
-        val_data_path = "../../input/data/dev.csv"
-        if os.path.exists(val_data_path):
-            log.info("검증 데이터 평가 시작")
-            evaluation_results = ensemble.evaluate_on_validation(val_data_path)
-            if evaluation_results:
-                scores = evaluation_results['realtime_token_ensemble_scores']
-                log.info(f"{method_name} 검증 점수 - ROUGE-avg: {scores['rouge-avg']:.4f}")
-        
-        # 테스트 데이터 추론
-        test_data_path = "../../input/data/test.csv"
-        if os.path.exists(test_data_path):
-            ensemble_df, generation_time = ensemble.run_ensemble(test_data_path)
-            
-            # 결과 저장
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            results_dir = "./ensemble_results"
-            os.makedirs(results_dir, exist_ok=True)
-            
-            result_path = os.path.join(results_dir, f"ensemble_{method_name}_{timestamp}.csv")
-            ensemble_df.to_csv(result_path, index=False, encoding='utf-8')
-            log.info(f"{method_name} 결과 저장: {result_path}")
-            log.info(f"{method_name} 생성 시간: {generation_time:.2f}초")
-    
-    # 후처리 방식들 (hard_voting, soft_voting, length_based)
-    else:
-        ensemble = PostProcessingEnsemble(existing_model_paths, device=device)
-        ensemble.load_models()
-        
-        # 검증 데이터로 개별 방식 평가
-        val_data_path = "../../input/data/dev.csv"
-        if os.path.exists(val_data_path):
-            log.info("검증 데이터 평가 시작")
-            val_df = pd.read_csv(val_data_path)
-            val_df_sample = val_df  # baseline.py와 동일하게 전체 데이터 사용
-            input_texts = val_df_sample['dialogue'].tolist()
-            reference_summaries = val_df_sample['summary'].tolist()
-            
-            # 선택한 방식으로만 생성
-            if method_name == "hard_voting":
-                # 모든 모델로 생성 후 하드 보팅
-                generated_texts_list = []
-                for model, tokenizer, config in zip(ensemble.models, ensemble.tokenizers, ensemble.configs):
-                    texts = ensemble.generate_with_single_model(model, tokenizer, config, input_texts)
-                    generated_texts_list.append(texts)
-                results = ensemble.token_level_hard_voting(generated_texts_list, ensemble.tokenizers[0])
-                
-            elif method_name == "soft_voting":
-                results = ensemble.soft_voting_ensemble(input_texts, ensemble.configs[0])
-                
-            elif method_name == "length_based":
-                results = ensemble.length_based_ensemble(input_texts, ensemble.configs[0])
-                
-            elif method_name == "logit_level":
-                results = ensemble.logit_level_ensemble(input_texts, ensemble.configs[0])
-            
-            # 개별 모델 성능도 함께 계산 (baseline.py 방식)
-            log.info("개별 모델 성능 계산 중 (baseline.py 방식)...")
-            individual_scores = ensemble.evaluate_individual_models(val_data_path)['individual_model_scores']
-            
-            # 앙상블 점수도 baseline.py 방식으로 계산
-            log.info("앙상블 점수 계산 중 (baseline.py 방식)...")
-            rouge_scores = evaluate_ensemble_results_with_baseline(
-                results, reference_summaries, ensemble.configs[0], ensemble.tokenizers[0]
-            )
-            
-            # 개별 모델 점수는 이미 baseline.py 방식으로 계산됨
-            
-            # 결과 출력
-            log.info("="*80)
-            log.info(f"🎯 {method_name.upper()} 성능 비교 결과 ({len(val_df_sample)}개 샘플, baseline.py 방식)")
-            log.info("="*80)
-            
-            # 개별 모델 점수 출력 (baseline.py 방식으로 계산된 점수)
-            log.info("📊 개별 모델 성능 (baseline.py 방식):")
-            best_individual_score = 0
-            best_model_idx = 0
-            for i, score_info in enumerate(individual_scores):
-                scores = score_info['rouge_scores']
-                log.info(f"  모델 {i+1}: ROUGE-avg {scores['rouge-avg']:.4f}")
-                if scores['rouge-avg'] > best_individual_score:
-                    best_individual_score = scores['rouge-avg']
-                    best_model_idx = i
-            
-            # 앙상블 점수 출력
-            log.info(f"🚀 {method_name.upper()} 앙상블: ROUGE-avg {rouge_scores['rouge-avg']:.4f}")
-            
-            # 성능 비교
-            improvement = rouge_scores['rouge-avg'] - best_individual_score
-            improvement_pct = (improvement / best_individual_score) * 100 if best_individual_score > 0 else 0
-            
-            log.info("="*80)
-            log.info("📈 성능 분석:")
-            log.info(f"  최고 개별 모델 (모델 {best_model_idx+1}): {best_individual_score:.4f}")
-            log.info(f"  {method_name.upper()} 앙상블:             {rouge_scores['rouge-avg']:.4f}")
-            log.info(f"  성능 차이:                      {improvement:+.4f} ({improvement_pct:+.1f}%)")
-            
-            if improvement > 0:
-                log.info("  ✅ 앙상블이 개별 모델을 능가했습니다!")
-            elif abs(improvement) < 0.01:
-                log.info("  🤝 앙상블과 개별 모델이 비슷한 성능을 보입니다.")
+            # 최고 점수 시퀀스 선택
+            if finished_sequences:
+                best_sequence, best_score = max(finished_sequences, key=lambda x: x[1])
             else:
-                log.info("  ⚠️  개별 모델이 앙상블보다 더 좋습니다.")
-            log.info("="*80)
-        
-        # 테스트 데이터 추론
-        test_data_path = "../../input/data/test.csv"
-        if os.path.exists(test_data_path):
-            test_df = pd.read_csv(test_data_path)
-            test_df_sample = test_df  # baseline.py와 동일하게 전체 테스트 데이터 처리
-            test_input_texts = test_df_sample['dialogue'].tolist()
+                best_idx = torch.argmax(beam_scores)
+                best_sequence = sequences[best_idx]
             
-            # 선택한 방식으로만 생성
-            if method_name == "hard_voting":
-                generated_texts_list = []
-                for model, tokenizer, config in zip(ensemble.models, ensemble.tokenizers, ensemble.configs):
-                    texts = ensemble.generate_with_single_model(model, tokenizer, config, test_input_texts)
-                    generated_texts_list.append(texts)
-                final_results = ensemble.token_level_hard_voting(generated_texts_list, ensemble.tokenizers[0])
-                
-            elif method_name == "soft_voting":
-                final_results = ensemble.soft_voting_ensemble(test_input_texts, ensemble.configs[0])
-                
-            elif method_name == "length_based":
-                final_results = ensemble.length_based_ensemble(test_input_texts, ensemble.configs[0])
-                
-            elif method_name == "logit_level":
-                final_results = ensemble.logit_level_ensemble(test_input_texts, ensemble.configs[0])
+            # 텍스트로 디코딩
+            generated_text = tokenizer.decode(best_sequence, skip_special_tokens=False)
+            for token in remove_tokens:
+                generated_text = generated_text.replace(token, " ")
             
-            # 결과 저장
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            results_dir = "./ensemble_results"
-            os.makedirs(results_dir, exist_ok=True)
-            
-            result_df = pd.DataFrame({
-                'fname': test_df_sample['fname'],
-                'summary': final_results
-            })
-            
-            result_path = os.path.join(results_dir, f"ensemble_{method_name}_{timestamp}.csv")
-            result_df.to_csv(result_path, index=False, encoding='utf-8')
-            log.info(f"{method_name} 결과 저장: {result_path}")
-    
-    log.info(f"🎉 {method_name} 실행 완료!")
-
-def main(ensemble_strategy="comprehensive"):
-    """
-    앙상블 추론 메인 함수
-    
-    Args:
-        ensemble_strategy: 앙상블 전략 ('comprehensive', 'hard_voting', 'soft_voting', 'length_based', 'realtime_token', 'post_token_voting', 'realtime_token_ensemble')
-    """
-    
-    # 🔬 종합 실험 실행 (모든 방식 비교)
-    if ensemble_strategy == "comprehensive":
-        return main_comprehensive_experiment()
-    
-    # 🎯 개별 방식 실행
-    if ensemble_strategy in ["hard_voting", "soft_voting", "length_based", "realtime_token", "logit_level"]:
-        return run_single_method(ensemble_strategy)
-    
-    # 기존 단일 전략 실행 (하위 호환성)
-    log.info(f"선택된 앙상블 전략: {ensemble_strategy}")
-    
-    # 공통 함수로 모델 경로 가져오기
-    existing_model_paths = get_model_paths()
-    if not existing_model_paths:
-        return
-    
-    log.info(f"총 {len(existing_model_paths)}개 모델로 앙상블 진행")
-    
-    # 앙상블 객체 생성
-    device = "cuda:0" if torch.cuda.is_available() else "cpu"
-    
-    if ensemble_strategy == "realtime_token_ensemble":
-        ensemble = RealtimeTokenEnsemble(existing_model_paths, device=device)
-    else:  # post_token_voting (default)
-        ensemble = PostProcessingEnsemble(existing_model_paths, device=device)
-    
-    # 모델들 로딩
-    try:
-        ensemble.load_models()
-    except Exception as e:
-        log.error(f"모델 로딩 실패: {e}")
-        return
-    
-    # 검증 데이터로 성능 평가 실행
-    val_data_path = "../../input/data/dev.csv"
-    evaluation_results = None
-    
-    if os.path.exists(val_data_path):
-        try:
-            log.info("="*50)
-            log.info("검증 데이터 성능 평가 시작")
-            log.info("="*50)
-            evaluation_results = ensemble.evaluate_on_validation(val_data_path)
-            
-            # 개별 모델 성능 로깅
-            log.info("개별 모델 성능:")
-            for score_info in evaluation_results['individual_model_scores']:
-                model_idx = score_info['model_index']
-                scores = score_info['rouge_scores']
-                model_name = score_info['model_metadata'].get('wandb_run_name', f'Model_{model_idx}')
-                log.info(f"  {model_name}: ROUGE-avg={scores['rouge-avg']:.4f}")
-            
-            # 앙상블 성능 로깅
-            ensemble_scores = evaluation_results['ensemble_scores']
-            log.info(f"앙상블 성능: ROUGE-avg={ensemble_scores['rouge-avg']:.4f}")
-            
-            # 개선 정도 계산
-            best_individual_score = max([s['rouge_scores']['rouge-avg'] for s in evaluation_results['individual_model_scores']])
-            improvement = ensemble_scores['rouge-avg'] - best_individual_score
-            log.info(f"최고 개별 모델 대비 개선: {improvement:+.4f}")
+            predictions.append(generated_text.strip())
             
         except Exception as e:
-            log.error(f"검증 데이터 평가 실패: {e}")
-    else:
-        log.warning(f"검증 데이터 파일이 없습니다 (검증 점수 계산 건너뜨): {val_data_path}")
+            log.warning(f"Logit 레벨 앙상블 샘플 {idx} 처리 실패: {e}")
+            predictions.append("")
     
-    # 앙상블 추론 실행
-    test_data_path = "../../input/data/test.csv"
-    if not os.path.exists(test_data_path):
-        log.error(f"테스트 데이터 파일이 없습니다: {test_data_path}")
+    # baseline.py 방식으로 ROUGE 계산
+    return convert_text_predictions_to_baseline_format(
+        predictions, reference_summaries, tokenizers[0], configs[0], "Logit 레벨 앙상블"
+    )
+
+def evaluate_realtime_token(models: List, tokenizers: List, configs: List, val_data: pd.DataFrame) -> Dict[str, float]:
+    """실시간 토큰 앙상블 평가"""
+    log.info("⚡ 실시간 토큰 앙상블 시작...")
+    
+    input_texts = val_data['dialogue'].tolist()
+    reference_summaries = val_data['summary'].tolist()
+    remove_tokens = configs[0]['inference']['remove_tokens']
+    tokenizer = tokenizers[0]
+    config = configs[0]
+    max_length = config['inference']['generate_max_length']
+    device = models[0].device
+    
+    predictions = []
+    
+    for text in tqdm(input_texts, desc="실시간 토큰 앙상블 처리"):
+        try:
+            # 입력 토큰화
+            inputs = tokenizer(
+                text,
+                return_tensors="pt",
+                max_length=config['tokenizer']['encoder_max_len'],
+                truncation=True,
+                padding=True
+            ).to(device)
+            
+            # 각 모델의 encoder 출력 미리 계산
+            model_encoder_outputs = []
+            for model in models:
+                with torch.no_grad():
+                    encoder_outputs = model.get_encoder()(
+                        input_ids=inputs['input_ids'],
+                        attention_mask=inputs['attention_mask']
+                    )
+                    model_encoder_outputs.append(encoder_outputs.last_hidden_state)
+            
+            # 시작 토큰으로 초기화
+            decoder_start_token_id = tokenizer.bos_token_id
+            if decoder_start_token_id is None:
+                decoder_start_token_id = tokenizer.eos_token_id
+            generated_sequence = [decoder_start_token_id]
+            eos_token_id = tokenizer.eos_token_id
+            
+            # 토큰별 생성 루프
+            for step in range(max_length - 1):
+                current_ids = torch.tensor([generated_sequence], device=device)
+                
+                # 각 모델에서 다음 토큰 logits 계산
+                model_logits = []
+                for i, model in enumerate(models):
+                    try:
+                        with torch.no_grad():
+                            decoder_outputs = model.get_decoder()(
+                                input_ids=current_ids,
+                                encoder_hidden_states=model_encoder_outputs[i],
+                                encoder_attention_mask=inputs['attention_mask']
+                            )
+                            
+                            logits = model.lm_head(decoder_outputs.last_hidden_state)
+                            next_token_logits = logits[0, -1, :]
+                            model_logits.append(next_token_logits)
+                            
+                    except Exception as e:
+                        log.warning(f"모델 {i+1} 스텝 {step} 오류: {e}")
+                        continue
+                
+                if not model_logits:
+                    break
+                
+                # 모든 모델의 logits 평균
+                ensemble_logits = torch.stack(model_logits).mean(dim=0)
+                
+                # 다음 토큰 선택 (greedy decoding)
+                next_token_id = torch.argmax(ensemble_logits).item()
+                
+                # EOS 토큰이면 종료
+                if next_token_id == eos_token_id:
+                    break
+                
+                generated_sequence.append(next_token_id)
+            
+            # 텍스트로 디코딩
+            generated_text = tokenizer.decode(generated_sequence, skip_special_tokens=True)
+            for token in remove_tokens:
+                generated_text = generated_text.replace(token, " ")
+            
+            predictions.append(generated_text.strip())
+            
+        except Exception as e:
+            log.warning(f"실시간 토큰 앙상블 샘플 처리 실패: {e}")
+            predictions.append("")
+    
+    # baseline.py 방식으로 ROUGE 계산
+    return convert_text_predictions_to_baseline_format(
+        predictions, reference_summaries, tokenizers[0], configs[0], "실시간 토큰 앙상블"
+    )
+
+# =============================================================================
+# 메인 실험 함수
+# =============================================================================
+
+def main_comprehensive_experiment():
+    """
+    🔬 다섯 가지 앙상블 방식 종합 비교 실험
+    각 방식이 완료될 때마다 즉시 결과를 출력합니다.
+    """
+    log.info("🔬 " + "="*60)
+    log.info("🎯 다섯 가지 앙상블 방식 종합 비교 실험 시작")
+    log.info("="*60)
+    
+    # 모델 경로 가져오기
+    model_paths = get_model_paths()
+    if not model_paths:
+        log.error("💥 사용 가능한 모델 파일이 없습니다!")
         return
     
-    try:
-        ensemble_results, individual_results = ensemble.run_ensemble(test_data_path)
-    except Exception as e:
-        log.error(f"앙상블 추론 실패: {e}")
+    log.info(f"🚀 총 {len(model_paths)}개 모델로 실험 진행")
+    
+    # 데이터 경로 확인
+    val_data_path = "../../input/data/dev.csv"
+    if not os.path.exists(val_data_path):
+        log.error(f"💥 검증 데이터 없음: {val_data_path}")
         return
     
-    # 결과 저장
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
-    # ensemble_results 폴더 생성
-    results_dir = "./ensemble_results"
-    os.makedirs(results_dir, exist_ok=True)
+    # 검증 데이터 로드
+    log.info("📊 검증 데이터 로드 중...")
+    val_data = pd.read_csv(val_data_path)
+    # DEV_DATA_LIMIT이 설정되어 있으면 해당 개수만큼만 사용
+    if DEV_DATA_LIMIT is not None and DEV_DATA_LIMIT > 0:
+        val_data = val_data.head(DEV_DATA_LIMIT)
+    log.info(f"검증 데이터 로드 완료: {len(val_data)}개 샘플")
     
-    # 하드 보팅 결과 저장
-    hard_voting_path = os.path.join(results_dir, f"ensemble_hard_voting_{timestamp}.csv")
-    ensemble_results['hard_voting'].to_csv(hard_voting_path, index=False, encoding='utf-8')
-    log.info(f"하드 보팅 앙상블 결과 저장: {hard_voting_path}")
+    # 테스트 데이터 로드
+    test_data_path = "../../input/data/test.csv"
+    test_data = None
+    if os.path.exists(test_data_path):
+        test_data = pd.read_csv(test_data_path)
+        # TEST_DATA_LIMIT이 설정되어 있으면 해당 개수만큼만 사용
+        if TEST_DATA_LIMIT is not None and TEST_DATA_LIMIT > 0:
+            test_data = test_data.head(TEST_DATA_LIMIT)
+        log.info(f"테스트 데이터 로드 완료: {len(test_data)}개 샘플")
+    else:
+        log.warning(f"테스트 데이터를 찾을 수 없습니다: {test_data_path}")
     
-    # 소프트 보팅 결과 저장
-    soft_voting_path = os.path.join(results_dir, f"ensemble_soft_voting_{timestamp}.csv")
-    ensemble_results['soft_voting'].to_csv(soft_voting_path, index=False, encoding='utf-8')
-    log.info(f"소프트 보팅 앙상블 결과 저장: {soft_voting_path}")
+    # 모델 로딩
+    log.info("🤖 모델들 로딩 중...")
+    models, tokenizers, configs, metadata_list = load_models(model_paths, device)
+    if not models:
+        log.error("💥 모델 로딩 실패!")
+        return
     
-    # 길이 기반 결과 저장
-    length_based_path = os.path.join(results_dir, f"ensemble_length_based_{timestamp}.csv")
-    ensemble_results['length_based'].to_csv(length_based_path, index=False, encoding='utf-8')
-    log.info(f"길이 기반 앙상블 결과 저장: {length_based_path}")
-    
-    # 개별 모델 결과들 저장
-    for i, individual_result in enumerate(individual_results):
-        individual_df = pd.DataFrame({
-            'fname': ensemble_results['hard_voting']['fname'],  # 하드 보팅 결과의 fname 사용
-            'summary': individual_result
-        })
-        individual_path = os.path.join(results_dir, f"individual_model_{i+1}_{timestamp}.csv")
-        individual_df.to_csv(individual_path, index=False, encoding='utf-8')
-        log.info(f"개별 모델 {i+1} 결과 저장: {individual_path}")
-    
-    # 앙상블 메타데이터 저장
-    ensemble_metadata = {
-        "timestamp": timestamp,
-        "num_models": len(existing_model_paths),
-        "model_paths": existing_model_paths,
-        "device": device,
-        "ensemble_strategies": ["hard_voting", "soft_voting", "length_based"],
-        "model_metadata": ensemble.metadata_list,
-        "evaluation_results": evaluation_results  # 검증 점수 결과 추가
+    # 실험 결과 저장용 딕셔너리
+    experiment_results = {
+        'timestamp': timestamp,
+        'model_paths': model_paths,
+        'device': device,
+        'validation_samples': len(val_data),
+        'methods': {},
+        'individual_model_scores': [],
+        'performance_ranking': [],
+        'time_ranking': []
     }
     
-    metadata_path = os.path.join(results_dir, f"ensemble_comparison_metadata_{timestamp}.json")
-    with open(metadata_path, "w", encoding='utf-8') as f:
-        json.dump(ensemble_metadata, f, indent=2, ensure_ascii=False)
-    log.info(f"앙상블 메타데이터 저장: {metadata_path}")
+    log.info("")
+    log.info("🚀 실험 시작! 각 방식이 완료되는 대로 점수를 출력합니다.")
+    log.info("="*60)
     
-    log.info("=" * 50)
-    log.info(f"앙상블 추론 완료! (하드 보팅 & 소프트 보팅 & 길이 기반)")
-    log.info(f"사용된 모델 수: {len(existing_model_paths)}")
-    log.info(f"하드 보팅 결과: {hard_voting_path}")
-    log.info(f"소프트 보팅 결과: {soft_voting_path}")
-    log.info(f"길이 기반 결과: {length_based_path}")
+    # 1. 개별 모델 평가
+    log.info("1️⃣ 개별 모델 성능 평가")
+    log.info("-"*30)
+    start_time = time.time()
+    individual_scores = evaluate_individual_models(models, tokenizers, configs, metadata_list, val_data)
+    individual_time = time.time() - start_time
+    experiment_results['individual_model_scores'] = individual_scores
+    log.info(f"⏱️  개별 모델 평가 완료: {individual_time:.2f}초")
+    log.info("")
     
-    # 검증 점수 요약 출력
-    if evaluation_results:
-        log.info(f"평가 결과 요약 (하드 vs 소프트 vs 길이 기반 비교):")
-        
-        # 하드 보팅 결과
-        hard_scores = evaluation_results['hard_voting_scores']
-        log.info(f"  하드 보팅 ROUGE-1: {hard_scores['rouge-1']:.4f}")
-        log.info(f"  하드 보팅 ROUGE-2: {hard_scores['rouge-2']:.4f}")
-        log.info(f"  하드 보팅 ROUGE-L: {hard_scores['rouge-l']:.4f}")
-        log.info(f"  하드 보팅 ROUGE-avg: {hard_scores['rouge-avg']:.4f}")
-        
-        # 소프트 보팅 결과
-        soft_scores = evaluation_results['soft_voting_scores']
-        log.info(f"  소프트 보팅 ROUGE-1: {soft_scores['rouge-1']:.4f}")
-        log.info(f"  소프트 보팅 ROUGE-2: {soft_scores['rouge-2']:.4f}")
-        log.info(f"  소프트 보팅 ROUGE-L: {soft_scores['rouge-l']:.4f}")
-        log.info(f"  소프트 보팅 ROUGE-avg: {soft_scores['rouge-avg']:.4f}")
-        
-        # 길이 기반 결과
-        length_scores = evaluation_results['length_based_scores']
-        log.info(f"  길이 기반 ROUGE-1: {length_scores['rouge-1']:.4f}")
-        log.info(f"  길이 기반 ROUGE-2: {length_scores['rouge-2']:.4f}")
-        log.info(f"  길이 기반 ROUGE-L: {length_scores['rouge-l']:.4f}")
-        log.info(f"  길이 기반 ROUGE-avg: {length_scores['rouge-avg']:.4f}")
-        
-        # 최고 성능 방식
-        best_method = evaluation_results.get('best_ensemble_method', 'Unknown')
-        log.info(f"  최고 성능 방식: {best_method}")
-        
-        # 개별 모델 성능 비교
-        best_individual_score = max([s['rouge_scores']['rouge-avg'] for s in evaluation_results['individual_model_scores']])
-        hard_improvement = hard_scores['rouge-avg'] - best_individual_score
-        soft_improvement = soft_scores['rouge-avg'] - best_individual_score
-        length_improvement = length_scores['rouge-avg'] - best_individual_score
-        log.info(f"  하드 보팅 개선: {hard_improvement:+.4f}")
-        log.info(f"  소프트 보팅 개선: {soft_improvement:+.4f}")
-        log.info(f"  길이 기반 개선: {length_improvement:+.4f}")
-        
-        # 개별 모델 성능 상세 정보
-        log.info("개별 모델 성능 상세:")
-        for i, score_info in enumerate(evaluation_results['individual_model_scores']):
-            scores = score_info['rouge_scores']
-            model_name = score_info['model_metadata'].get('wandb_run_name', f'Model_{i+1}')
-            log.info(f"    {model_name}: ROUGE-avg={scores['rouge-avg']:.4f}")
+    # 2. 하드 보팅 앙상블
+    log.info("2️⃣ 하드 보팅 앙상블")
+    log.info("-"*30)
+    start_time = time.time()
+    hard_voting_scores = evaluate_hard_voting(models, tokenizers, configs, val_data)
+    hard_voting_time = time.time() - start_time
+    experiment_results['methods']['hard_voting'] = {
+        'rouge_scores': hard_voting_scores,
+        'time_seconds': hard_voting_time,
+        'method_type': 'Post-processing'
+    }
+    log.info(f"⏱️  하드 보팅 완료: {hard_voting_time:.2f}초")
     
-    log.info("=" * 50)
+    # 하드 보팅 테스트 추론
+    if test_data is not None:
+        csv_path = run_test_inference_for_method(models, tokenizers, configs, "hard_voting", test_data, timestamp)
+        experiment_results['methods']['hard_voting']['test_csv_path'] = csv_path
     
-    return evaluation_results
+    log.info("")
+    
+    # 3. 소프트 보팅 앙상블
+    log.info("3️⃣ 소프트 보팅 앙상블")
+    log.info("-"*30)
+    start_time = time.time()
+    soft_voting_scores = evaluate_soft_voting(models, tokenizers, configs, val_data)
+    soft_voting_time = time.time() - start_time
+    experiment_results['methods']['soft_voting'] = {
+        'rouge_scores': soft_voting_scores,
+        'time_seconds': soft_voting_time,
+        'method_type': 'Post-processing'
+    }
+    log.info(f"⏱️  소프트 보팅 완료: {soft_voting_time:.2f}초")
+    
+    # 소프트 보팅 테스트 추론
+    if test_data is not None:
+        csv_path = run_test_inference_for_method(models, tokenizers, configs, "soft_voting", test_data, timestamp)
+        experiment_results['methods']['soft_voting']['test_csv_path'] = csv_path
+    
+    log.info("")
+    
+    # 4. 길이 기반 앙상블
+    log.info("4️⃣ 길이 기반 앙상블")
+    log.info("-"*30)
+    start_time = time.time()
+    length_based_scores = evaluate_length_based(models, tokenizers, configs, val_data)
+    length_based_time = time.time() - start_time
+    experiment_results['methods']['length_based'] = {
+        'rouge_scores': length_based_scores,
+        'time_seconds': length_based_time,
+        'method_type': 'Post-processing'
+    }
+    log.info(f"⏱️  길이 기반 완료: {length_based_time:.2f}초")
+    
+    # 길이 기반 테스트 추론
+    if test_data is not None:
+        csv_path = run_test_inference_for_method(models, tokenizers, configs, "length_based", test_data, timestamp)
+        experiment_results['methods']['length_based']['test_csv_path'] = csv_path
+    
+    log.info("")
+    
+    # 5. Logit 레벨 앙상블
+    log.info("5️⃣ Logit 레벨 앙상블")
+    log.info("-"*30)
+    start_time = time.time()
+    logit_level_scores = evaluate_logit_level(models, tokenizers, configs, val_data)
+    logit_level_time = time.time() - start_time
+    experiment_results['methods']['logit_level'] = {
+        'rouge_scores': logit_level_scores,
+        'time_seconds': logit_level_time,
+        'method_type': 'Runtime'
+    }
+    log.info(f"⏱️  Logit 레벨 완료: {logit_level_time:.2f}초")
+    
+    # Logit 레벨 테스트 추론
+    if test_data is not None:
+        csv_path = run_test_inference_for_method(models, tokenizers, configs, "logit_level", test_data, timestamp)
+        experiment_results['methods']['logit_level']['test_csv_path'] = csv_path
+    
+    log.info("")
+    
+    # 6. 실시간 토큰 앙상블
+    log.info("6️⃣ 실시간 토큰 앙상블")
+    log.info("-"*30)
+    start_time = time.time()
+    realtime_token_scores = evaluate_realtime_token(models, tokenizers, configs, val_data)
+    realtime_token_time = time.time() - start_time
+    experiment_results['methods']['realtime_token_ensemble'] = {
+        'rouge_scores': realtime_token_scores,
+        'time_seconds': realtime_token_time,
+        'method_type': 'Runtime'
+    }
+    log.info(f"⏱️  실시간 토큰 완료: {realtime_token_time:.2f}초")
+    
+    # 실시간 토큰 테스트 추론
+    if test_data is not None:
+        csv_path = run_test_inference_for_method(models, tokenizers, configs, "realtime_token_ensemble", test_data, timestamp)
+        experiment_results['methods']['realtime_token_ensemble']['test_csv_path'] = csv_path
+    
+    log.info("")
+    
+    # 최종 비교 및 순위 정리
+    log.info("🏆 최종 실험 결과 요약")
+    log.info("="*60)
+    
+    # 성능 순위 (ROUGE-avg 기준)
+    performance_ranking = []
+    for method_name, method_data in experiment_results['methods'].items():
+        rouge_avg = method_data['rouge_scores']['rouge-avg']
+        time_seconds = method_data['time_seconds']
+        performance_ranking.append((method_name, rouge_avg, time_seconds))
+    
+    performance_ranking.sort(key=lambda x: x[1], reverse=True)
+    experiment_results['performance_ranking'] = performance_ranking
+    
+    # 시간 순위 (실행 시간 기준)
+    time_ranking = sorted(performance_ranking, key=lambda x: x[2])
+    experiment_results['time_ranking'] = time_ranking
+    
+    # 결과 출력
+    log.info("📊 성능 순위 (ROUGE-avg 기준):")
+    for i, (method, rouge_avg, time_sec) in enumerate(performance_ranking, 1):
+        log.info(f"  {i}위: {method:<20} ROUGE-avg: {rouge_avg:.6f} ({time_sec:.1f}초)")
+    
+    log.info("")
+    log.info("⏱️ 실행 시간 순위:")
+    for i, (method, rouge_avg, time_sec) in enumerate(time_ranking, 1):
+        log.info(f"  {i}위: {method:<20} {time_sec:.1f}초 (ROUGE-avg: {rouge_avg:.6f})")
+    
+    # 최고 성능 방법의 CSV를 최종 제출용으로 복사
+    if test_data is not None and performance_ranking:
+        best_method = performance_ranking[0][0]
+        best_csv_path = experiment_results['methods'][best_method].get('test_csv_path')
+        if best_csv_path:
+            final_csv_path = os.path.join("./prediction", f"best_{best_method}_{timestamp}.csv")
+            import shutil
+            shutil.copy2(best_csv_path, final_csv_path)
+            log.info(f"🏆 최고 성능 방법 ({best_method}) 결과를 최종 제출용으로 저장: {final_csv_path}")
+    
+    # 결과 저장
+    json_path = save_results_to_json(experiment_results, timestamp)
+    
+    log.info("")
+    log.info("✅ 모든 앙상블 실험 완료!")
+    log.info(f"📁 결과 파일: {json_path}")
+    if test_data is not None:
+        log.info("📁 테스트 추론 결과는 ./prediction 폴더에 저장됨")
+    log.info("="*60)
+    
+    return experiment_results
 
-if __name__ == "__main__":
-    import argparse
+def run_single_method(method_name: str):
+    """단일 앙상블 방식 실행"""
+    log.info(f"🎯 {method_name} 단일 방식 실행 모드")
     
-    parser = argparse.ArgumentParser(
-        description='앙상블 추론 시스템 - 여러 모델을 앙상블하여 텍스트 요약 생성',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-사용 예시:
-  python ensemble_inference.py                     # 모든 방식 비교 실행
-  python ensemble_inference.py --mode=all          # 모든 방식 비교 실행  
-  python ensemble_inference.py --mode=hard_voting  # 하드 보팅만 실행
-  python ensemble_inference.py --mode=soft_voting  # 소프트 보팅만 실행
-  python ensemble_inference.py --mode=length_based # 길이 기반만 실행
-  python ensemble_inference.py --mode=realtime_token # 실시간 토큰 앙상블만 실행
-  python ensemble_inference.py --mode=logit_level    # 최적화된 Logit 앙상블만 실행
+    # 모델 로딩
+    model_paths = get_model_paths()
+    if not model_paths:
+        return
+    
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    models, tokenizers, configs, metadata_list = load_models(model_paths, device)
+    if not models:
+        return
+    
+    # 검증 데이터 로드
+    val_data_path = "../../input/data/dev.csv"
+    if not os.path.exists(val_data_path):
+        log.error(f"검증 데이터 없음: {val_data_path}")
+        return
+    
+    val_data = pd.read_csv(val_data_path)
+    # DEV_DATA_LIMIT이 설정되어 있으면 해당 개수만큼만 사용
+    if DEV_DATA_LIMIT is not None and DEV_DATA_LIMIT > 0:
+        val_data = val_data.head(DEV_DATA_LIMIT)
+    log.info(f"검증 데이터 로드 완료: {len(val_data)}개 샘플")
+    
+    # 해당 방식 실행
+    start_time = time.time()
+    
+    if method_name == "hard_voting":
+        scores = evaluate_hard_voting(models, tokenizers, configs, val_data)
+    elif method_name == "soft_voting":
+        scores = evaluate_soft_voting(models, tokenizers, configs, val_data)
+    elif method_name == "length_based":
+        scores = evaluate_length_based(models, tokenizers, configs, val_data)
+    elif method_name == "logit_level":
+        scores = evaluate_logit_level(models, tokenizers, configs, val_data)
+    elif method_name == "realtime_token":
+        scores = evaluate_realtime_token(models, tokenizers, configs, val_data)
+    else:
+        log.error(f"알 수 없는 방식: {method_name}")
+        return
+    
+    elapsed_time = time.time() - start_time
+    log.info(f"✅ {method_name} 실행 완료: {elapsed_time:.2f}초")
 
-앙상블 방식 설명:
-  all           - 모든 방식을 비교하여 최적 방식 추천
-  hard_voting   - 각 모델이 완전한 텍스트 생성 후 토큰별 다수결
-  soft_voting   - 각 모델의 확률 분포를 평균하여 최적 후보 선택
-  length_based  - 각 모델 결과 중 가장 긴 것을 선택
-  realtime_token- 매 토큰마다 모든 모델의 확률 분포를 평균하여 생성
-  logit_level   - 최적화된 Logit 앙상블 (Nucleus Sampling + Beam Search)
-        """)
+# =============================================================================
+# 메인 실행부
+# =============================================================================
+
+def main():
+    parser = argparse.ArgumentParser(description='대화 요약 앙상블 추론 (간소화된 함수 기반 버전)')
     
     parser.add_argument(
         '--mode', 
@@ -2529,10 +1404,292 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
-    # 선택된 모드 로깅
-    if args.mode == 'all':
-        log.info("🔬 모든 앙상블 방식 비교 모드 시작")
-        main("comprehensive")
+    log.info("🔬 대화 요약 앙상블 추론 시스템 시작")
+    log.info(f"선택된 모드: {args.mode}")
+    
+    if args.mode == "all":
+        main_comprehensive_experiment()
     else:
-        log.info(f"🎯 개별 방식 실행 모드: {args.mode}")
-        main(args.mode)
+        run_single_method(args.mode)
+
+# =============================================================================
+# 테스트 데이터 추론 함수들
+# =============================================================================
+
+def test_inference_hard_voting(models: List, tokenizers: List, configs: List, input_texts: List[str], remove_tokens: List[str]) -> List[str]:
+    """하드 보팅 테스트 추론"""
+    predictions = []
+    
+    for i, input_text in enumerate(tqdm(input_texts, desc="하드보팅 테스트 추론")):
+        try:
+            model_token_ids = []
+            
+            for model_idx, (model, tokenizer, config) in enumerate(zip(models, tokenizers, configs)):
+                inputs = tokenizer(
+                    input_text,
+                    max_length=config['tokenizer']['encoder_max_len'],
+                    truncation=True,
+                    padding=True
+                ).to(model.device)
+                
+                with torch.no_grad():
+                    output_ids = model.generate(
+                        input_ids=inputs['input_ids'],
+                        attention_mask=inputs['attention_mask'],
+                        max_length=config['inference']['generate_max_length'],
+                        num_beams=config['inference']['num_beams'],
+                        no_repeat_ngram_size=config['inference']['no_repeat_ngram_size'],
+                        early_stopping=config['inference']['early_stopping']
+                    )
+                
+                generated_ids = output_ids[0].tolist()
+                model_token_ids.append(generated_ids)
+            
+            # 하드 보팅: 각 위치별 최빈값 선택
+            max_len = max(len(ids) for ids in model_token_ids)
+            
+            ensemble_ids = []
+            for pos in range(max_len):
+                position_tokens = []
+                for ids in model_token_ids:
+                    if pos < len(ids):
+                        position_tokens.append(ids[pos])
+                
+                if position_tokens:
+                    ensemble_ids.append(max(set(position_tokens), key=position_tokens.count))
+            
+            # 텍스트 디코딩
+            ensemble_text = tokenizers[0].decode(ensemble_ids, skip_special_tokens=True)
+            for token in remove_tokens:
+                ensemble_text = ensemble_text.replace(token, " ")
+            
+            predictions.append(ensemble_text.strip())
+            
+        except Exception as e:
+            log.warning(f"하드보팅 테스트 추론 샘플 처리 실패: {e}")
+            predictions.append("")
+    
+    return predictions
+
+def test_inference_soft_voting(models: List, tokenizers: List, configs: List, input_texts: List[str], remove_tokens: List[str]) -> List[str]:
+    """소프트 보팅 테스트 추론"""
+    predictions = []
+    
+    for input_text in tqdm(input_texts, desc="소프트보팅 테스트 추론"):
+        try:
+            model_outputs = []
+            
+            for model, tokenizer, config in zip(models, tokenizers, configs):
+                inputs = tokenizer(
+                    input_text,
+                    max_length=config['tokenizer']['encoder_max_len'],
+                    truncation=True,
+                    padding=True
+                ).to(model.device)
+                
+                with torch.no_grad():
+                    outputs = model.generate(
+                        input_ids=inputs['input_ids'],
+                        attention_mask=inputs['attention_mask'],
+                        max_length=config['inference']['generate_max_length'],
+                        num_beams=config['inference']['num_beams'],
+                        no_repeat_ngram_size=config['inference']['no_repeat_ngram_size'],
+                        early_stopping=config['inference']['early_stopping'],
+                        return_dict_in_generate=True,
+                        output_scores=True,
+                        num_return_sequences=config['inference']['num_beams']
+                    )
+                
+                for sequence in outputs.sequences:
+                    text_output = tokenizer.decode(sequence, skip_special_tokens=True)
+                    for token in remove_tokens:
+                        text_output = text_output.replace(token, " ")
+                    model_outputs.append(text_output.strip())
+            
+            # 소프트 보팅: 평균 스코어가 가장 높은 결과 선택
+            if model_outputs:
+                predictions.append(model_outputs[0])  # 첫 번째 결과 사용
+            else:
+                predictions.append("")
+                
+        except Exception as e:
+            log.warning(f"소프트보팅 테스트 추론 샘플 처리 실패: {e}")
+            predictions.append("")
+    
+    return predictions
+
+def test_inference_length_based(models: List, tokenizers: List, configs: List, input_texts: List[str], remove_tokens: List[str]) -> List[str]:
+    """길이 기반 테스트 추론"""
+    predictions = []
+    
+    for input_text in tqdm(input_texts, desc="길이기반 테스트 추론"):
+        try:
+            candidates = []
+            
+            for model, tokenizer, config in zip(models, tokenizers, configs):
+                inputs = tokenizer(
+                    input_text,
+                    max_length=config['tokenizer']['encoder_max_len'],
+                    truncation=True,
+                    padding=True
+                ).to(model.device)
+                
+                with torch.no_grad():
+                    output_ids = model.generate(
+                        input_ids=inputs['input_ids'],
+                        attention_mask=inputs['attention_mask'],
+                        max_length=config['inference']['generate_max_length'],
+                        num_beams=config['inference']['num_beams'],
+                        no_repeat_ngram_size=config['inference']['no_repeat_ngram_size'],
+                        early_stopping=config['inference']['early_stopping']
+                    )
+                
+                generated_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+                for token in remove_tokens:
+                    generated_text = generated_text.replace(token, " ")
+                
+                candidates.append(generated_text.strip())
+            
+            # 가장 긴 결과 선택
+            if candidates:
+                longest_candidate = max(candidates, key=len)
+                predictions.append(longest_candidate)
+            else:
+                predictions.append("")
+                
+        except Exception as e:
+            log.warning(f"길이기반 테스트 추론 샘플 처리 실패: {e}")
+            predictions.append("")
+    
+    return predictions
+
+def test_inference_logit_level(models: List, tokenizers: List, configs: List, input_texts: List[str], remove_tokens: List[str]) -> List[str]:
+    """Logit 레벨 테스트 추론"""
+    predictions = []
+    
+    for input_text in tqdm(input_texts, desc="Logit레벨 테스트 추론"):
+        try:
+            inputs = tokenizers[0](
+                input_text,
+                max_length=configs[0]['inference']['max_length'],
+                truncation=True,
+                padding=True
+            ).to(models[0].device)
+            
+            # 빔 서치 파라미터
+            max_length = configs[0]['inference']['generate_max_length']
+            num_beams = configs[0]['inference']['num_beams']
+            
+            # 초기 시퀀스
+            batch_size = inputs['input_ids'].size(0)
+            device = inputs['input_ids'].device
+            
+            sequences = inputs['input_ids'].clone()
+            scores = torch.zeros(batch_size, device=device)
+            finished = torch.zeros(batch_size, dtype=torch.bool, device=device)
+            
+            # 생성 루프
+            for step in range(max_length - sequences.size(1)):
+                if finished.all():
+                    break
+                
+                # 모든 모델의 logit 수집
+                ensemble_logits = None
+                
+                for model in models:
+                    with torch.no_grad():
+                        outputs = model(input_ids=sequences, attention_mask=torch.ones_like(sequences))
+                        current_logits = outputs.logits[:, -1, :]  # 마지막 위치의 logits
+                        
+                        if ensemble_logits is None:
+                            ensemble_logits = current_logits.clone()
+                        else:
+                            ensemble_logits += current_logits
+                
+                # 평균 logits 계산
+                ensemble_logits = ensemble_logits / len(models)
+                
+                # 다음 토큰 예측
+                next_token_logits = ensemble_logits
+                next_tokens = torch.argmax(next_token_logits, dim=-1)
+                
+                # 시퀀스 업데이트
+                sequences = torch.cat([sequences, next_tokens.unsqueeze(-1)], dim=-1)
+                
+                # EOS 토큰 체크
+                eos_token_id = tokenizers[0].eos_token_id
+                if eos_token_id is not None:
+                    finished = finished | (next_tokens == eos_token_id)
+            
+            # 최종 시퀀스에서 생성된 부분만 추출
+            generated_sequence = sequences[0][inputs['input_ids'].size(1):]
+            generated_text = tokenizers[0].decode(generated_sequence, skip_special_tokens=True)
+            
+            for token in remove_tokens:
+                generated_text = generated_text.replace(token, " ")
+            
+            predictions.append(generated_text.strip())
+            
+        except Exception as e:
+            log.warning(f"Logit레벨 테스트 추론 샘플 처리 실패: {e}")
+            predictions.append("")
+    
+    return predictions
+
+def test_inference_realtime_token(models: List, tokenizers: List, configs: List, input_texts: List[str], remove_tokens: List[str]) -> List[str]:
+    """실시간 토큰 테스트 추론"""
+    predictions = []
+    
+    for input_text in tqdm(input_texts, desc="실시간토큰 테스트 추론"):
+        try:
+            inputs = tokenizers[0](
+                input_text,
+                max_length=configs[0]['inference']['max_length'],
+                truncation=True,
+                padding=True
+            ).to(models[0].device)
+            
+            max_length = configs[0]['inference']['generate_max_length']
+            sequences = inputs['input_ids'].clone()
+            device = inputs['input_ids'].device
+            
+            # 토큰별 생성
+            for step in range(max_length - sequences.size(1)):
+                model_predictions = []
+                
+                # 각 모델의 다음 토큰 예측
+                for model in models:
+                    with torch.no_grad():
+                        outputs = model(input_ids=sequences)
+                        next_token_logits = outputs.logits[0, -1, :]
+                        next_token = torch.argmax(next_token_logits).item()
+                        model_predictions.append(next_token)
+                
+                # 다수결 투표
+                if model_predictions:
+                    ensemble_token = max(set(model_predictions), key=model_predictions.count)
+                    sequences = torch.cat([sequences, torch.tensor([[ensemble_token]], device=device)], dim=1)
+                    
+                    # EOS 토큰 체크
+                    if ensemble_token == tokenizers[0].eos_token_id:
+                        break
+                else:
+                    break
+            
+            # 생성된 부분만 디코딩
+            generated_sequence = sequences[0][inputs['input_ids'].size(1):]
+            generated_text = tokenizers[0].decode(generated_sequence, skip_special_tokens=True)
+            
+            for token in remove_tokens:
+                generated_text = generated_text.replace(token, " ")
+            
+            predictions.append(generated_text.strip())
+            
+        except Exception as e:
+            log.warning(f"실시간토큰 테스트 추론 샘플 처리 실패: {e}")
+            predictions.append("")
+    
+    return predictions
+
+if __name__ == "__main__":
+    main()
