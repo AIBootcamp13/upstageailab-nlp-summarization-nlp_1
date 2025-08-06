@@ -36,6 +36,7 @@ import shutil
 import zipfile
 import time
 from datetime import datetime
+import argparse
 
 import torch
 import pytorch_lightning as pl
@@ -772,8 +773,14 @@ def run_inference(config, model=None, tokenizer=None):
 
 def main():
     """전체 파이프라인을 실행하는 메인 함수"""
+    # 명령행 인자 파싱
+    parser = argparse.ArgumentParser(description='Baseline model training and inference')
+    parser.add_argument('--config', type=str, default='./config.yaml', 
+                        help='Path to config file (default: ./config.yaml)')
+    args = parser.parse_args()
+    
     # Config 로드
-    config = load_config()
+    config = load_config(args.config)
     
     # 재현성을 위한 시드 설정 (config에서 시드 값 가져오기)
     seed = config['training']['seed']
