@@ -26,6 +26,12 @@ import os; os.chdir(os.path.dirname(os.path.abspath(__file__)))
 import sys; sys.path.append('../utils')
 import log_util as log
 
+# 검증 데이터 개수 제한 (None이면 전체 데이터 사용)
+DEV_DATA_LIMIT = 50  # 0이나 None이 아닌 정수를 설정하면 해당 개수만큼만 사용
+
+# 테스트 데이터 개수 제한 (None이면 전체 데이터 사용)
+TEST_DATA_LIMIT = 50  # 0이나 None이 아닌 정수를 설정하면 해당 개수만큼만 사용
+
 import pandas as pd
 import json
 import yaml
@@ -59,14 +65,14 @@ def get_model_paths():
         "./models/model_baseline_20250805_060913.zip",
         "./models/model_baseline_20250805_094805.zip",
         # 추가
-        "./models/model_baseline_20250805_234915.zip",
-        "./models/model_baseline_20250806_033243.zip",
-        "./models/model_baseline_20250805_191209.zip",
-        "./models/model_baseline_20250805_173237.zip",
-        "./models/model_baseline_20250805_183711.zip",
+        # "./models/model_baseline_20250805_234915.zip",
+        # "./models/model_baseline_20250806_033243.zip",
+        # "./models/model_baseline_20250805_191209.zip",
+        # "./models/model_baseline_20250805_173237.zip",
+        # "./models/model_baseline_20250805_183711.zip",
         # AEDA
-        "./models/model_baseline_20250806_083123.zip",
-        "./models/model_baseline_20250806_084905.zip",
+        # "./models/model_baseline_20250806_083123.zip",
+        # "./models/model_baseline_20250806_084905.zip",
     ]
     
     # 존재하는 모델 파일만 필터링
@@ -725,6 +731,9 @@ class RealtimeTokenEnsemble:
         # 검증 데이터 로드
         try:
             val_df = pd.read_csv(val_data_path)
+            # DEV_DATA_LIMIT이 설정되어 있으면 해당 개수만큼만 사용
+            if DEV_DATA_LIMIT is not None and DEV_DATA_LIMIT > 0:
+                val_df = val_df.head(DEV_DATA_LIMIT)
             
             # 필수 컬럼 존재 확인
             required_columns = ['dialogue', 'summary']
@@ -842,7 +851,11 @@ class RealtimeTokenEnsemble:
         # 테스트 데이터 로드
         try:
             test_df = pd.read_csv(test_data_path)
-            test_df_sample = test_df.head(200)  # 200개 테스트 데이터 처리
+            # TEST_DATA_LIMIT이 설정되어 있으면 해당 개수만큼만 사용, 없으면 기본 200개
+            if TEST_DATA_LIMIT is not None and TEST_DATA_LIMIT > 0:
+                test_df_sample = test_df.head(TEST_DATA_LIMIT)
+            else:
+                test_df_sample = test_df.head(200)  # 200개 테스트 데이터 처리
             input_texts = test_df_sample['dialogue'].tolist()
             log.info(f"테스트 데이터 로드 완료: {len(input_texts)}개 샘플")
         except Exception as e:
@@ -1889,8 +1902,11 @@ class PostProcessingEnsemble:
         
         # 검증 데이터 로드 (빠른 테스트를 위해 일부만 사용)
         val_df = pd.read_csv(val_data_path)
-        # 빠른 테스트를 위해 처음 50개만 사용
-        val_df = val_df.head(50)
+        # DEV_DATA_LIMIT이 설정되어 있으면 해당 개수만큼만 사용, 없으면 기본 50개
+        if DEV_DATA_LIMIT is not None and DEV_DATA_LIMIT > 0:
+            val_df = val_df.head(DEV_DATA_LIMIT)
+        else:
+            val_df = val_df.head(50)
         input_texts = val_df['dialogue'].tolist()
         reference_summaries = val_df['summary'].tolist()
         log.info(f"검증 데이터 로드 완룼: {len(input_texts)}개 샘플 (빠른 테스트용)")
@@ -2042,6 +2058,9 @@ class PostProcessingEnsemble:
         
         # 테스트 데이터 로드
         test_df = pd.read_csv(test_data_path)
+        # TEST_DATA_LIMIT이 설정되어 있으면 해당 개수만큼만 사용
+        if TEST_DATA_LIMIT is not None and TEST_DATA_LIMIT > 0:
+            test_df = test_df.head(TEST_DATA_LIMIT)
         input_texts = test_df['dialogue'].tolist()
         log.info(f"테스트 데이터 로드 완료: {len(input_texts)}개 샘플")
         
@@ -2298,7 +2317,11 @@ def run_single_method(method_name):
         if os.path.exists(val_data_path):
             log.info("검증 데이터 평가 시작")
             val_df = pd.read_csv(val_data_path)
-            val_df_sample = val_df  # baseline.py와 동일하게 전체 데이터 사용
+            # DEV_DATA_LIMIT이 설정되어 있으면 해당 개수만큼만 사용, 없으면 전체 데이터
+            if DEV_DATA_LIMIT is not None and DEV_DATA_LIMIT > 0:
+                val_df_sample = val_df.head(DEV_DATA_LIMIT)
+            else:
+                val_df_sample = val_df  # baseline.py와 동일하게 전체 데이터 사용
             input_texts = val_df_sample['dialogue'].tolist()
             reference_summaries = val_df_sample['summary'].tolist()
             
@@ -2373,7 +2396,11 @@ def run_single_method(method_name):
         test_data_path = "../../input/data/test.csv"
         if os.path.exists(test_data_path):
             test_df = pd.read_csv(test_data_path)
-            test_df_sample = test_df  # baseline.py와 동일하게 전체 테스트 데이터 처리
+            # TEST_DATA_LIMIT이 설정되어 있으면 해당 개수만큼만 사용, 없으면 전체 데이터
+            if TEST_DATA_LIMIT is not None and TEST_DATA_LIMIT > 0:
+                test_df_sample = test_df.head(TEST_DATA_LIMIT)
+            else:
+                test_df_sample = test_df  # baseline.py와 동일하게 전체 테스트 데이터 처리
             test_input_texts = test_df_sample['dialogue'].tolist()
             
             # 선택한 방식으로만 생성
