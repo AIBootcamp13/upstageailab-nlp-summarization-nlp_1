@@ -1,0 +1,3 @@
+# conf/model/model.yaml
+model_type: "bart"
+pretrained_model_name: "digit82/kobart-summarization"

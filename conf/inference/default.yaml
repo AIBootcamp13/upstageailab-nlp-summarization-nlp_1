@@ -1,0 +1,10 @@
+# conf/inference/default.yaml
+# 이 파일은 추론 관련 설정을 정의합니다.
+ckt_path: "model ckt path" # 사전 학습이 모델의 checkpoint를 저장 경로
+result_path: "../prediction/"
+no_repeat_ngram_size: 2
+early_stopping: True
+generate_max_length: 100
+num_beams: 4
+batch_size: 32
+remove_tokens: ['<usr>', '<s>', '</s>', '<pad>'] # AutoTokenizer에서 가져올 예정
