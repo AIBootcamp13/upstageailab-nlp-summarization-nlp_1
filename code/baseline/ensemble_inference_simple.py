@@ -27,6 +27,12 @@ import sys; sys.path.append('../utils')
 import log_util as log
 from baseline import compute_metrics
 
+# 검증 데이터 개수 제한 (None이면 전체 데이터 사용)
+DEV_DATA_LIMIT = 50  # 0이나 None이 아닌 정수를 설정하면 해당 개수만큼만 사용
+
+# 테스트 데이터 개수 제한 (None이면 전체 데이터 사용)
+TEST_DATA_LIMIT = 50  # 0이나 None이 아닌 정수를 설정하면 해당 개수만큼만 사용
+
 import argparse
 import json
 import time
@@ -279,9 +285,7 @@ def calculate_rouge_scores_with_baseline(predictions_ids: List[List[int]], label
         ROUGE 점수 딕셔너리
     """
     try:
-        # 패딩을 사용해 동일한 길이로 맞추기
-        from transformers.utils import PaddingStrategy
-        from transformers.tokenization_utils_base import pad_sequences
+        # 패딩을 사용해 동일한 길이로 맞추기 (수동 패딩 구현)
         
         # 최대 길이 계산
         max_pred_len = max(len(seq) for seq in predictions_ids) if predictions_ids else 1
@@ -319,14 +323,22 @@ def calculate_rouge_scores_with_baseline(predictions_ids: List[List[int]], label
             'label_ids': labels_array
         })()
         
+        # 디버깅: compute_metrics 호출 전 데이터 확인
+        log.info(f"🔍 compute_metrics 호출 - predictions shape: {predictions_array.shape}, labels shape: {labels_array.shape}")
+        log.info(f"🔍 예측 샘플: {predictions_array[0][:10]} ...")
+        log.info(f"🔍 라벨 샘플: {labels_array[0][:10]} ...")
+        
         # baseline.py의 compute_metrics 사용
         metrics = compute_metrics(config, tokenizer, pred_object)
         
+        # 디버깅: compute_metrics 결과 확인
+        log.info(f"🔍 compute_metrics 원본 결과: {metrics}")
+        
         # 결과를 앙상블 형식으로 변환
         rouge_scores = {
-            'rouge-1': metrics.get('eval_rouge1_fmeasure', 0.0),
-            'rouge-2': metrics.get('eval_rouge2_fmeasure', 0.0),
-            'rouge-l': metrics.get('eval_rougeL_fmeasure', 0.0)
+            'rouge-1': metrics.get('rouge-1', 0.0),
+            'rouge-2': metrics.get('rouge-2', 0.0),
+            'rouge-l': metrics.get('rouge-l', 0.0)
         }
         rouge_scores['rouge-avg'] = (rouge_scores['rouge-1'] + rouge_scores['rouge-2'] + rouge_scores['rouge-l']) / 3
         
@@ -368,12 +380,12 @@ def convert_text_predictions_to_baseline_format(predictions: List[str], referenc
     
     # 참조 답안을 토큰 ID로 변환
     for ref_text in reference_summaries:
-        ref_tokens = tokenizer(ref_text, return_tensors="pt", truncation=True, padding=False)
+        ref_tokens = tokenizer(ref_text, return_tensors="pt", truncation=True, padding=False, max_length=512)
         labels_ids.append(ref_tokens['input_ids'][0].tolist())
     
     # 예측 결과를 토큰 ID로 변환
     for pred_text in predictions:
-        pred_tokens = tokenizer(pred_text, return_tensors="pt", truncation=True, padding=False)
+        pred_tokens = tokenizer(pred_text, return_tensors="pt", truncation=True, padding=False, max_length=512)
         predictions_ids.append(pred_tokens['input_ids'][0].tolist())
     
     # baseline.py의 compute_metrics 사용하여 ROUGE 계산
@@ -676,6 +688,12 @@ def evaluate_hard_voting(models: List, tokenizers: List, configs: List, val_data
             log.warning(f"하드보팅 샘플 {sample_idx} 처리 실패: {e}")
             predictions.append("")
     
+    # 디버깅: 예측 결과 확인
+    log.info(f"🔍 하드 보팅 예측 결과 샘플 (총 {len(predictions)}개):")
+    for i in range(min(3, len(predictions))):
+        log.info(f"  예측 {i+1}: '{predictions[i]}'")
+        log.info(f"  참조 {i+1}: '{reference_summaries[i]}'")
+    
     # baseline.py 방식으로 ROUGE 계산
     return convert_text_predictions_to_baseline_format(
         predictions, reference_summaries, tokenizers[0], configs[0], "하드 보팅 앙상블"
@@ -761,7 +779,7 @@ def evaluate_length_based(models: List, tokenizers: List, configs: List, val_dat
     # 참조 답안을 토큰 ID로 변환
     tokenizer = tokenizers[0]
     for ref_text in reference_summaries:
-        ref_tokens = tokenizer(ref_text, return_tensors="pt", truncation=True, padding=False)
+        ref_tokens = tokenizer(ref_text, return_tensors="pt", truncation=True, padding=False, max_length=512)
         labels_ids.append(ref_tokens['input_ids'][0].tolist())
     
     for text in tqdm(input_texts, desc="길이 기반 앙상블 처리"):
@@ -1080,6 +1098,9 @@ def main_comprehensive_experiment():
     # 검증 데이터 로드
     log.info("📊 검증 데이터 로드 중...")
     val_data = pd.read_csv(val_data_path)
+    # DEV_DATA_LIMIT이 설정되어 있으면 해당 개수만큼만 사용
+    if DEV_DATA_LIMIT is not None and DEV_DATA_LIMIT > 0:
+        val_data = val_data.head(DEV_DATA_LIMIT)
     log.info(f"검증 데이터 로드 완료: {len(val_data)}개 샘플")
     
     # 테스트 데이터 로드
@@ -1087,6 +1108,9 @@ def main_comprehensive_experiment():
     test_data = None
     if os.path.exists(test_data_path):
         test_data = pd.read_csv(test_data_path)
+        # TEST_DATA_LIMIT이 설정되어 있으면 해당 개수만큼만 사용
+        if TEST_DATA_LIMIT is not None and TEST_DATA_LIMIT > 0:
+            test_data = test_data.head(TEST_DATA_LIMIT)
         log.info(f"테스트 데이터 로드 완료: {len(test_data)}개 샘플")
     else:
         log.warning(f"테스트 데이터를 찾을 수 없습니다: {test_data_path}")
@@ -1295,6 +1319,9 @@ def run_single_method(method_name: str):
         return
     
     val_data = pd.read_csv(val_data_path)
+    # DEV_DATA_LIMIT이 설정되어 있으면 해당 개수만큼만 사용
+    if DEV_DATA_LIMIT is not None and DEV_DATA_LIMIT > 0:
+        val_data = val_data.head(DEV_DATA_LIMIT)
     log.info(f"검증 데이터 로드 완료: {len(val_data)}개 샘플")
     
     # 해당 방식 실행
@@ -1357,7 +1384,7 @@ def test_inference_hard_voting(models: List, tokenizers: List, configs: List, in
             for model_idx, (model, tokenizer, config) in enumerate(zip(models, tokenizers, configs)):
                 inputs = tokenizer(
                     input_text,
-                    max_length=config['inference']['max_length'],
+                    max_length=config['tokenizer']['encoder_max_len'],
                     truncation=True,
                     padding=True
                 ).to(model.device)
@@ -1412,7 +1439,7 @@ def test_inference_soft_voting(models: List, tokenizers: List, configs: List, in
             for model, tokenizer, config in zip(models, tokenizers, configs):
                 inputs = tokenizer(
                     input_text,
-                    max_length=config['inference']['max_length'],
+                    max_length=config['tokenizer']['encoder_max_len'],
                     truncation=True,
                     padding=True
                 ).to(model.device)
@@ -1459,7 +1486,7 @@ def test_inference_length_based(models: List, tokenizers: List, configs: List, i
             for model, tokenizer, config in zip(models, tokenizers, configs):
                 inputs = tokenizer(
                     input_text,
-                    max_length=config['inference']['max_length'],
+                    max_length=config['tokenizer']['encoder_max_len'],
                     truncation=True,
                     padding=True
                 ).to(model.device)
