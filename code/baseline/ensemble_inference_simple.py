@@ -62,7 +62,11 @@ def set_seed(seed: int = 42):
     np.random.seed(seed)
     torch.manual_seed(seed)
     if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
         torch.cuda.manual_seed_all(seed)
+    # CUDNN 재현성 설정 (ensemble_inference_best.py와 동일)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 # =============================================================================
 # 공통 유틸리티 함수들
@@ -135,9 +139,9 @@ def load_models(model_paths: List[str], device: str) -> Tuple[List, List, List, 
                 metadata = json.load(f)
             log.info("메타데이터 로드 완료")
             
-            # 시드 설정 (메타데이터에서)
-            if 'training_seed' in metadata:
-                seed = metadata['training_seed']
+            # 시드 설정 (config에서 - ensemble_inference_best.py와 동일)
+            if 'training' in config and 'seed' in config['training']:
+                seed = config['training']['seed']
                 set_seed(seed)
                 log.info(f"모델 로딩 시 시드 설정: {seed}")
             
@@ -827,7 +831,7 @@ def evaluate_length_based(models: List, tokenizers: List, configs: List, val_dat
     return rouge_scores
 
 def evaluate_logit_level(models: List, tokenizers: List, configs: List, val_data: pd.DataFrame) -> Dict[str, float]:
-    """Logit 레벨 앙상블 평가 (최적화된 Beam Search)"""
+    """Logit 레벨 앙상블 평가 (최적화된 Beam Search + Nucleus Sampling)"""
     log.info("🎯 Logit 레벨 앙상블 시작...")
     
     input_texts = val_data['dialogue'].tolist()
@@ -838,6 +842,9 @@ def evaluate_logit_level(models: List, tokenizers: List, configs: List, val_data
     max_length = config['inference']['generate_max_length']
     num_beams = config['inference']['num_beams']
     device = models[0].device
+    
+    # Nucleus Sampling 파라미터 추가
+    top_p = 1.0  # ensemble_inference_best.py와 동일하게 설정 (Nucleus Sampling 비활성화)
     
     predictions = []
     
@@ -863,7 +870,9 @@ def evaluate_logit_level(models: List, tokenizers: List, configs: List, val_data
                     encoder_outputs_list.append(encoder_outputs.last_hidden_state.clone().detach())
             
             # Beam Search 초기화
-            decoder_start_token_id = tokenizer.bos_token_id or tokenizer.eos_token_id
+            decoder_start_token_id = tokenizer.bos_token_id
+            if decoder_start_token_id is None:
+                decoder_start_token_id = tokenizer.eos_token_id
             batch_size = 1
             beam_size = num_beams
             
@@ -888,19 +897,51 @@ def evaluate_logit_level(models: List, tokenizers: List, configs: List, val_data
                 # 각 모델에서 logits 계산
                 all_next_logits = []
                 for model_idx, model in enumerate(models):
-                    with torch.no_grad():
-                        decoder_outputs = model.get_decoder()(
-                            input_ids=current_sequences,
-                            encoder_hidden_states=encoder_outputs_list[model_idx].expand(len(current_sequences), -1, -1),
-                            encoder_attention_mask=inputs['attention_mask'].expand(len(current_sequences), -1)
-                        )
-                        
-                        logits = model.lm_head(decoder_outputs.last_hidden_state)
-                        next_token_logits = logits[:, -1, :]
-                        all_next_logits.append(next_token_logits)
+                    try:
+                        with torch.no_grad():
+                            decoder_outputs = model.get_decoder()(
+                                input_ids=current_sequences,
+                                encoder_hidden_states=encoder_outputs_list[model_idx].expand(len(current_sequences), -1, -1),
+                                encoder_attention_mask=inputs['attention_mask'].expand(len(current_sequences), -1)
+                            )
+                            
+                            logits = model.lm_head(decoder_outputs.last_hidden_state)
+                            next_token_logits = logits[:, -1, :]
+                            all_next_logits.append(next_token_logits)
+                    except Exception as e:
+                        log.warning(f"모델 {model_idx} 스텝 {step} 처리 실패: {e}")
+                        continue
+                
+                # 모든 모델이 실패한 경우 처리
+                if not all_next_logits:
+                    log.warning(f"샘플 {idx}: 모든 모델이 실패, 빈 문자열 반환")
+                    predictions.append("")
+                    break
                 
                 # 모든 모델의 logits 평균
                 ensemble_logits = torch.stack(all_next_logits).mean(dim=0)
+                
+                # Nucleus Sampling (Top-p) 적용
+                if top_p < 1.0:
+                    for beam_idx in range(ensemble_logits.size(0)):
+                        sorted_logits, sorted_indices = torch.sort(ensemble_logits[beam_idx], descending=True)
+                        sorted_probs = torch.softmax(sorted_logits, dim=-1)
+                        cumulative_probs = torch.cumsum(sorted_probs, dim=-1)
+                        
+                        # 누적 확률이 top_p를 초과하는 토큰들 제거
+                        sorted_indices_to_remove = cumulative_probs > top_p
+                        sorted_indices_to_remove[1:] = sorted_indices_to_remove[:-1].clone()
+                        sorted_indices_to_remove[0] = 0
+                        
+                        indices_to_remove = sorted_indices[sorted_indices_to_remove]
+                        ensemble_logits[beam_idx, indices_to_remove] = -float('inf')
+                        
+                        # 모든 토큰이 제거된 경우 응급처치 (best.py와 동일)
+                        valid_tokens = (ensemble_logits[beam_idx] > -float('inf')).sum().item()
+                        if valid_tokens == 0:
+                            # 최고 확률 토큰 하나는 유지
+                            best_token_idx = torch.argmax(sorted_logits)
+                            ensemble_logits[beam_idx, sorted_indices[best_token_idx]] = sorted_logits[best_token_idx]
                 
                 # Log probabilities 계산
                 next_token_log_probs = torch.log_softmax(ensemble_logits, dim=-1)
@@ -956,7 +997,7 @@ def evaluate_logit_level(models: List, tokenizers: List, configs: List, val_data
                 best_sequence = sequences[best_idx]
             
             # 텍스트로 디코딩
-            generated_text = tokenizer.decode(best_sequence, skip_special_tokens=True)
+            generated_text = tokenizer.decode(best_sequence, skip_special_tokens=False)
             for token in remove_tokens:
                 generated_text = generated_text.replace(token, " ")
             
@@ -1007,7 +1048,9 @@ def evaluate_realtime_token(models: List, tokenizers: List, configs: List, val_d
                     model_encoder_outputs.append(encoder_outputs.last_hidden_state)
             
             # 시작 토큰으로 초기화
-            decoder_start_token_id = tokenizer.bos_token_id or tokenizer.eos_token_id
+            decoder_start_token_id = tokenizer.bos_token_id
+            if decoder_start_token_id is None:
+                decoder_start_token_id = tokenizer.eos_token_id
             generated_sequence = [decoder_start_token_id]
             eos_token_id = tokenizer.eos_token_id
             
