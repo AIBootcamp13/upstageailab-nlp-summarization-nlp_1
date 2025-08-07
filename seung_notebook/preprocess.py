@@ -60,9 +60,9 @@ def apply_preprocessing(df: pd.DataFrame, is_train=True):
 # ✅ 8. 사용 예시
 if __name__ == "__main__":
     # CSV 경로 설정
-    train_path = "../data/train.csv"
-    dev_path = "../data/dev.csv"
-    test_path = "../data/test.csv"
+    train_path = "./data/train.csv"
+    dev_path = "./data/dev.csv"
+    test_path = "./data/test.csv"
 
     # 불러오기
     train = pd.read_csv(train_path)
@@ -75,8 +75,8 @@ if __name__ == "__main__":
     test_clean = apply_preprocessing(test, is_train=False)
 
     # 저장
-    train_clean.to_csv("../data/train_clean.csv", index=False)
-    dev_clean.to_csv("../data/dev_clean.csv", index=False)
-    test_clean.to_csv("../data/test_clean.csv", index=False)
+    train_clean.to_csv("./data/train_clean.csv", index=False)
+    dev_clean.to_csv("./data/dev_clean.csv", index=False)
+    test_clean.to_csv("./data/test_clean.csv", index=False)
 
     print("전처리 완료 ✅")
