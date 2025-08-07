@@ -44,27 +44,93 @@
 ### Directory
 
 ```
-├── code
-│   ├── baseline
-│   │   ├── baseline.ipynb       # 베이스라인 Jupyter notebook 버전
-│   │   ├── baseline.py          # 베이스라인 .py 버전
-│   │   ├── config.yaml          # 모델 설정 파일
-│   │   ├── solar_api.ipynb      # Solar API 활용 notebook
-│   │   ├── solar_api.py         # Solar API 활용 .py 버전
-│   └── utils
-│       ├── check_gpu.py         # GPU 확인 유틸리티
-│       └── log_util.py          # 로깅 유틸리티
-├── input
-│   ├── get_data.sh              # 데이터 다운로드 스크립트
-│   └── data
-│       ├── train.csv            # 학습 데이터
-│       ├── dev.csv              # 검증 데이터
-│       ├── test.csv             # 테스트 데이터
-│       └── sample_submission.csv # 제출 예시
-├── pyproject.toml               # 프로젝트 의존성 및 메타데이터 정의 (UV)
-├── .python-version              # 프로젝트에서 사용할 Python 버전 지정 (UV)
-├── uv.lock                      # 의존성 버전 잠금 파일 (UV)
-└── README.md                    # 프로젝트 문서
+├── code # 코드 관련 폴더
+│   ├── baseline # 베이스라인 코드 폴더
+│   │   ├── baseline.ipynb # 베이스라인 주피터 노트북 버전
+│   │   ├── baseline.py # 베이스라인 .py 버전
+│   │   ├── config.yaml # 모델 설정 파일
+│   │   ├── env_template.txt # 환경 변수 템플릿
+│   │   ├── requirements.txt # 필수 라이브러리 목록
+│   │   ├── solar_api.ipynb # Solar API 활용 주피터 노트북
+│   │   └── solar_api.py # Solar API 활용 .py 버전
+│   ├── jhryu # jhryu 팀원 폴더
+│   │   ├── aeda_augmentation.py # EDA 데이터 증강 스크립트
+│   │   ├── augmented_data # EDA 증강 데이터 저장 디렉토리
+│   │   │   ├── aeda_report.json # EDA 증강 결과 및 리포트
+│   │   │   ├── augmentation_report.json # 데이터 증강 결과 및 리포트
+│   │   │   └── train2.csv # 증강된 학습 데이터
+│   │   ├── baseline.py # 개선된 베이스라인 스크립트
+│   │   ├── config # 실험별 설정 파일 디렉토리
+│   │   │   ├── config_1.yaml # 설정 파일 1
+│   │   │   ├── config_2.yaml # 설정 파일 2
+│   │   │   ├── config_3.yaml # 설정 파일 3
+│   │   │   ├── config_4.yaml # 설정 파일 4
+│   │   │   ├── config_5.yaml # 설정 파일 5
+│   │   │   ├── config_6.yaml # 설정 파일 6
+│   │   │   ├── config_7.yaml # 설정 파일 7
+│   │   │   └── config_8.yaml # 설정 파일 8
+│   │   ├── config_sweep_solar.yaml # Solar API sweep 설정
+│   │   ├── config_sweep.yaml # sweep 설정 파일
+│   │   ├── config.yaml # 메인 모델 설정 파일
+│   │   ├── data_augmentation.py # 데이터 증강 스크립트
+│   │   ├── ensemble_inference_best.py # 앙상블 추론 스크립트 - 리더보드 갱신
+│   │   ├── ensemble_inference.log # 앙상블 추론 로그
+│   │   ├── ensemble_inference.py # 앙상블 추론 스크립트
+│   │   ├── ensemble_usage.md # 앙상블 사용법 문서
+│   │   ├── env_template.txt # 환경 변수 템플릿
+│   │   ├── inference.py # 단일 모델 추론 스크립트
+│   │   ├── solar_api_sweep.py # Solar API sweep 스크립트
+│   │   ├── solar_api.py # Solar API 활용 스크립트
+│   │   └── wandb_sweep.py # wandb sweep 실행 스크립트
+│   ├── Moon # Moon 팀원 폴더
+│   │   ├── conf # 설정 파일 폴더
+│   │   │   ├── config.yaml # 메인 설정 파일
+│   │   │   ├── data # 데이터 설정
+│   │   │   │   └── default.yaml # 기본 데이터 설정
+│   │   │   ├── inference # 추론 설정
+│   │   │   │   └── default.yaml # 기본 추론 설정
+│   │   │   ├── model # 모델 설정
+│   │   │   │   └── model.yaml # 기본 모델 설정
+│   │   │   └── training # 학습 설정
+│   │   │       └── default.yaml # 기본 학습 설정
+│   │   ├── docs # 문서 폴더
+│   │   │   └── Wandb.README.md # Wandb 문서
+│   │   ├── input # 입력 데이터 관련 폴더
+│   │   │   └── get_data.sh # 데이터 다운로드 스크립트
+│   │   ├── jupyter # 주피터 노트북 폴더
+│   │   │   └── EDA.ipynb # EDA 주피터 노트북
+│   │   └── src # 소스코드 폴더
+│   │       ├── check_gpu.py # GPU 확인 유틸리티
+│   │       ├── data.py # 데이터 처리 스크립트
+│   │       ├── inference.py # 추론 스크립트
+│   │       ├── main.ipynb # 메인 주피터 노트북
+│   │       ├── main.py # 메인 실행 스크립트
+│   │       ├── model.py # 모델 스크립트
+│   │       ├── train.py # 학습 스크립트
+│   │       └── utils.py # 유틸리티 스크립트
+│   ├── seung_notebook # seung 팀원 폴더
+│   │   ├── baseline.py # 베이스라인 스크립트
+│   │   ├── eda.ipynb # EDA 주피터 노트북
+│   │   └── preprocess.py # 전처리 스크립트
+│   └── utils # 공통 유틸리티 폴더
+│       ├── check_gpu.py # GPU 확인 유틸리티
+│       └── log_util.py # 로깅 유틸리티
+├── config.yaml # 메인 설정 파일
+├── data # 데이터 폴더
+│   ├── dev_clean.csv # 검증 데이터 (클린)
+│   ├── dev.csv # 검증 데이터
+│   ├── sample_submission.csv # 제출 예시
+│   ├── test_clean.csv # 테스트 데이터 (클린)
+│   ├── test.csv # 테스트 데이터
+│   ├── train_clean.csv # 학습 데이터 (클린)
+│   └── train.csv # 학습 데이터
+├── docs # 문서 폴더
+│   └── Wandb.README.md # Wandb 문서
+├── input # 입력 데이터 관련 폴더
+│   └── get_data.sh # 데이터 다운로드 스크립트
+├── pyproject.toml # 프로젝트 의존성 및 메타데이터 정의 (UV)
+├── README.md # 프로젝트 문서
+└── uv.lock # 의존성 버전 잠금 파일 (UV)
 ```
 
 ### 참고 사항
@@ -117,6 +183,25 @@ uv run code/baseline/baseline.py
   - Train 시: decoder_input에 BOS 토큰 추가, decoder_output에 EOS 토큰 추가
   - Inference 시: 생성된 요약문에서 특수 토큰 제거
 
+### Data Augmentation
+
+#### AEDA (An Easier Data Augmentation)
+
+- **증강 방식**: 
+  - 구두점 삽입: 문장 중간에 쉼표, 말줄임표 등 자연스러운 구두점 추가
+  - 감탄사/추임새 삽입: '음', '아', '그런데', '그러니까' 등 한국어 자연스러운 추임새 추가  
+  - 유의어 교체: '좋아'→'괜찮아', '네'→'예' 등 기본적인 유의어 변환
+  - 높임말/반말 변환: 문체 일관성을 유지하면서 존댓말과 반말 간 변환
+  - 문장 분할/결합: 긴 문장 분리 또는 짧은 문장들의 자연스러운 결합
+
+- **증강 강도**: medium (샘플당 2개 변형 생성)
+- **특징**: API 없이 빠른 속도로 한국어 대화문에 특화된 증강 수행
+
+- **성능 결과**:
+  - AEDA 2앙상블: 49.52(Mid) 45.61(Final) 
+  - 증강없음 3앙상블: 49.69(Mid) 46.54(Final)
+  - **분석**: 성능 차이가 미미하여 단순한 규칙 기반 증강으로는 실질적 성능 향상 한계 확인
+
 ## 4. Modeling
 
 ### Model descrition
@@ -130,7 +215,15 @@ uv run code/baseline/baseline.py
   - 한국어 요약 태스크에 특화된 사전 학습 모델
   - BART의 강력한 생성 능력과 한국어 이해 능력 결합
   - Fine-tuning을 통해 대화 요약 태스크에 적응 가능
+  
+  - **사용 모델**: psyche/KoT5-summarization
+  - T5 기반 한국어 요약 전용 모델
 
+  - **선택 이유**:
+  - 한국어 요약 태스크에 특화된 사전 학습 모델
+  - T5의 유연한 인코더-디코더 구조를 활용한 안정적인 성능
+  - Encoder와 Decoder의 embedding 공유
+  
 ### Modeling Process
 
 #### 1. 학습 설정
@@ -161,12 +254,81 @@ uv run code/baseline/baseline.py
 - ROUGE 점수 기반 성능 평가
 - 학습/검증 손실 추적
 
+### Hyperparameter Optimization
+
+#### WandB Sweep을 통한 파라미터 최적화
+
+**1. 베이스라인 모델 최적화 (wandb_sweep.py)**
+- **최적화 방법**: Bayesian Optimization
+- **목표 지표**: eval/rouge-1 최대화
+- **주요 최적화 파라미터**:
+  - Learning Rate: 1e-5 ~ 5e-4 (log uniform)
+  - Batch Size: [8, 16, 32, 48]
+  - Epochs: 5 ~ 20
+  - Warmup Ratio: 0.0 ~ 0.2
+  - Scheduler: [cosine, linear, polynomial]
+  - Sequence Length: encoder(256~768), decoder(40~120)
+  - Beam Search: [4, 6, 8, 10, 12]
+
+**2. Solar API 파라미터 최적화 (solar_api_sweep.py)**  
+- **최적화 방법**: Bayesian Optimization
+- **목표 지표**: eval/rouge_avg 최대화
+- **주요 최적화 파라미터**:
+  - Model: [solar-pro2, solar-pro, solar-mini, solar-1-mini-chat 등]
+  - Few-shot Count: [1, 2, 3, 4, 5]
+  - Temperature: 0.1 ~ 0.5 (창의성 조절)
+  - Top-p: 0.1 ~ 0.9 (토큰 선택 범위)
+**특징**:
+- API Rate Limit 고려한 10분 대기 시간 포함
+- 파라미터 오버라이드 기능으로 특정 값 고정 가능
+
+### Model Ensemble
+
+#### 5가지 앙상블 기법 (ensemble_inference.py)
+
+**앙상블 방법**:
+
+**🔄 Post-Generation 앙상블** (개별 모델 추론 후 결과 후처리):
+1. **Hard Voting**: 각 모델이 완전한 텍스트 생성 후 토큰별 다수결 투표
+2. **Score-based Selection**: 각 모델이 Beam Search로 여러 후보 생성 후 점수가 가장 높은 결과 선택
+3. **Length Based**: 각 모델 결과 중 가장 긴 것을 선택
+
+**⚡ Real-time 앙상블** (실시간으로 토큰별 앙상블 추론):
+4. **Logit Level**: 최적화된 Logit 앙상블 (Nucleus Sampling + Beam Search)
+5. **Realtime Token**: 매 토큰마다 모든 모델의 확률 분포를 평균하여 생성
+
+**성능 결과 (ROUGE-avg 기준)**:
+- **1위: Logit Level** - 0.296869 (292.5초) - **리더보드 갱신**
+- 2위: Length Based - 0.276318 (269.7초)
+- 3위: Score-based Selection - 0.215161 (272.5초) 
+- 4위: Realtime Token - 0.211966 (216.3초)
+- 5위: Hard Voting - 0.197943 (271.1초)
+
+**실행 시간 순위**:
+- **1위: Realtime Token** - 216.3초 (가장 빠름)
+- 2위: Length Based - 269.7초
+- 3위: Hard Voting - 271.1초
+- 4위: Score-based Selection - 272.5초
+- 5위: Logit Level - 292.5초
+
+**특징**:
+- 8개 사전 훈련된 모델을 활용한 앙상블로 리더보드 갱신 (Rouge평균 49.6957)
+- 각 방법별 즉시 ROUGE 점수 출력 및 성능 비교
+- baseline.py와 동일한 평가 방식으로 정확한 성능 측정
+
+
 ## 5. Result
 
 ### Leader Board
 
-- 평가 지표: ROUGE-L F1 Score
-- 제출 파일 형식: CSV (fname, summary 컬럼)
+- **평가 지표**: ROUGE-L F1 Score
+- **제출 파일 형식**: CSV (fname, summary 컬럼)
+
+**최종 성능 결과**:
+- **8모델 앙상블**: ROUGE-L 49.69(Mid), 46.54(Final)
+- **3모델 앙상블**: ROUGE-L 49.29(Mid), 46.43(Final)  
+- **AEDA 2모델 앙상블**: ROUGE-L 49.52(Mid), 45.61(Final)
+- **단일 모델 파라미터 최적화**: ROUGE-L 48.04(Mid), 45.41(Final)
 
 ### Presentation
 
