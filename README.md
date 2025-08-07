@@ -53,7 +53,7 @@
 │   │   ├── requirements.txt # 필수 라이브러리 목록
 │   │   ├── solar_api.ipynb # Solar API 활용 주피터 노트북
 │   │   └── solar_api.py # Solar API 활용 .py 버전
-│   ├── jhryu # jhryu 팀원 폴더
+│   ├── jhryu # 팀원 폴더
 │   │   ├── aeda_augmentation.py # EDA 데이터 증강 스크립트
 │   │   ├── augmented_data # EDA 증강 데이터 저장 디렉토리
 │   │   │   ├── aeda_report.json # EDA 증강 결과 및 리포트
@@ -61,20 +61,11 @@
 │   │   │   └── train2.csv # 증강된 학습 데이터
 │   │   ├── baseline.py # 개선된 베이스라인 스크립트
 │   │   ├── config # 실험별 설정 파일 디렉토리
-│   │   │   ├── config_1.yaml # 설정 파일 1
-│   │   │   ├── config_2.yaml # 설정 파일 2
-│   │   │   ├── config_3.yaml # 설정 파일 3
-│   │   │   ├── config_4.yaml # 설정 파일 4
-│   │   │   ├── config_5.yaml # 설정 파일 5
-│   │   │   ├── config_6.yaml # 설정 파일 6
-│   │   │   ├── config_7.yaml # 설정 파일 7
-│   │   │   └── config_8.yaml # 설정 파일 8
 │   │   ├── config_sweep_solar.yaml # Solar API sweep 설정
 │   │   ├── config_sweep.yaml # sweep 설정 파일
 │   │   ├── config.yaml # 메인 모델 설정 파일
 │   │   ├── data_augmentation.py # 데이터 증강 스크립트
 │   │   ├── ensemble_inference_best.py # 앙상블 추론 스크립트 - 리더보드 갱신
-│   │   ├── ensemble_inference.log # 앙상블 추론 로그
 │   │   ├── ensemble_inference.py # 앙상블 추론 스크립트
 │   │   ├── ensemble_usage.md # 앙상블 사용법 문서
 │   │   ├── env_template.txt # 환경 변수 템플릿
@@ -82,7 +73,7 @@
 │   │   ├── solar_api_sweep.py # Solar API sweep 스크립트
 │   │   ├── solar_api.py # Solar API 활용 스크립트
 │   │   └── wandb_sweep.py # wandb sweep 실행 스크립트
-│   ├── Moon # Moon 팀원 폴더
+│   ├── Moon # 팀장 폴더
 │   │   ├── conf # 설정 파일 폴더
 │   │   │   ├── config.yaml # 메인 설정 파일
 │   │   │   ├── data # 데이터 설정
@@ -108,7 +99,7 @@
 │   │       ├── model.py # 모델 스크립트
 │   │       ├── train.py # 학습 스크립트
 │   │       └── utils.py # 유틸리티 스크립트
-│   ├── seung_notebook # seung 팀원 폴더
+│   ├── seung_notebook # 팀원 폴더
 │   │   ├── baseline.py # 베이스라인 스크립트
 │   │   ├── eda.ipynb # EDA 주피터 노트북
 │   │   └── preprocess.py # 전처리 스크립트
@@ -294,28 +285,27 @@ uv run code/baseline/baseline.py
 3. **Length Based**: 각 모델 결과 중 가장 긴 것을 선택
 
 **⚡ Real-time 앙상블** (실시간으로 토큰별 앙상블 추론):
-4. **Logit Level**: 최적화된 Logit 앙상블 (Nucleus Sampling + Beam Search)
-5. **Realtime Token**: 매 토큰마다 모든 모델의 확률 분포를 평균하여 생성
+4. **Logit Beam Search**: 각 스텝에서 상위 k개의 빔을 유지하고 점수 기반으로 최종 선택
+5. **Logit Greedy Decoding**: 매 토큰마다 모든 모델의 확률 분포를 평균하여 생성
 
 **성능 결과 (ROUGE-avg 기준)**:
-- **1위: Logit Level** - 0.296869 (292.5초) - **리더보드 갱신**
+- **1위: Logit Beam Search** - 0.296869 (292.5초) - **리더보드 갱신**
 - 2위: Length Based - 0.276318 (269.7초)
 - 3위: Score-based Selection - 0.215161 (272.5초) 
-- 4위: Realtime Token - 0.211966 (216.3초)
+- 4위: Logit Greedy Decoding - 0.211966 (216.3초)
 - 5위: Hard Voting - 0.197943 (271.1초)
 
 **실행 시간 순위**:
-- **1위: Realtime Token** - 216.3초 (가장 빠름)
+- **1위: Logit Greedy Decoding** - 216.3초 (가장 빠름)
 - 2위: Length Based - 269.7초
 - 3위: Hard Voting - 271.1초
 - 4위: Score-based Selection - 272.5초
-- 5위: Logit Level - 292.5초
+- 5위: Logit Beam Search - 292.5초
 
 **특징**:
 - 8개 사전 훈련된 모델을 활용한 앙상블로 리더보드 갱신 (Rouge평균 49.6957)
 - 각 방법별 즉시 ROUGE 점수 출력 및 성능 비교
 - baseline.py와 동일한 평가 방식으로 정확한 성능 측정
-
 
 ## 5. Result
 
