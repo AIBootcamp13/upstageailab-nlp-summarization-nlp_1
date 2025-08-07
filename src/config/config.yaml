@@ -1,0 +1,66 @@
+# 경진대회 원본 baseline 하이퍼파라미터 설정
+# /root/z_notebooks/config_original.yaml 기준
+
+general:
+  data_path: ../data/
+  model_name: digit82/kobart-summarization
+  output_dir: outputs/models/
+  preprocess_version: v1
+  seed: 42
+
+inference:
+  batch_size: 32
+  ckt_path: model ckt path
+  early_stopping: true
+  generate_max_length: 100             # 원본 baseline 값
+  no_repeat_ngram_size: 2
+  num_beams: 4                         # 리더보드 최고 모델 값
+  output_file: outputs/predictions/submission.csv
+  remove_tokens:
+  - <usr>
+  - <s>
+  - </s>
+  - <pad>
+  result_path: ./prediction/
+
+tokenizer:
+  bos_token: <s>
+  decoder_max_len: 100
+  encoder_max_len: 512
+  eos_token: </s>
+  special_tokens:
+  - '#Person1#'
+  - '#Person2#'
+  - '#Person3#'
+  - '#PhoneNumber#'
+  - '#Address#'
+  - '#PassportNumber#'
+
+training:
+  do_eval: true
+  do_train: true
+  early_stopping_patience: 3          # 리더보드 최고 모델 값
+  early_stopping_threshold: 0.001     # 리더보드 최고 모델 값
+  eval_strategy: epoch                 # train.py와 호환
+  fp16: true
+  generation_max_length: 100          # 원본 baseline 값
+  gradient_accumulation_steps: 1
+  learning_rate: 1.0e-05              # 리더보드 최고 모델 값
+  load_best_model_at_end: true
+  metric_for_best_model: rouge1       # baseline 호환 메트릭
+  greater_is_better: true
+  logging_dir: ./logs
+  logging_strategy: epoch
+  lr_scheduler_type: cosine
+  num_train_epochs: 20                # 리더보드 최고 모델 값
+  optim: adamw_torch
+  overwrite_output_dir: true
+  per_device_eval_batch_size: 32      # 원본 baseline 값
+  per_device_train_batch_size: 50     # 리더보드 최고 모델 값
+  predict_with_generate: true
+  report_to: none
+  save_strategy: epoch
+  save_total_limit: 5
+  seed: 42
+  warmup_ratio: 0.1                   # 리더보드 최고 모델 값
+  weight_decay: 0.01                  # 리더보드 최고 모델 값
