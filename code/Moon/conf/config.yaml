@@ -1,0 +1,17 @@
+defaults:
+  - model: model
+  - data: default
+  - training: default
+  - inference: default
+
+general:
+  data_path: "../data/"
+  output_dir: "../outputs/"
+  model_name: "digit82/kobart-summarization"
+
+tokenizer:
+  encoder_max_len: 512
+  decoder_max_len: 100
+  bos_token: "<s>" # AutoTokenizer에서 가져올 예정
+  eos_token: "</s>" # AutoTokenizer에서 가져올 예정
+  special_tokens: ['#Person1#', '#Person2#', '#Person3#', '#PhoneNumber#', '#Address#', '#PassportNumber#']
