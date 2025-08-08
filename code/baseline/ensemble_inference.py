@@ -76,9 +76,8 @@ def get_model_paths() -> List[str]:
     """ensemble_inference.py에서 사용했던 정확히 동일한 3개 모델 사용"""
     # ensemble_inference.py에서 지정했던 정확한 모델들
     model_paths = [
-        "./models/model_baseline_20250805_070447.zip",  
-        "./models/model_baseline_20250805_060913.zip",
-        "./models/model_baseline_20250805_094805.zip",
+        "./models/model_baseline_20250807_224158.zip",  
+        "./models/model_baseline_20250807_230111.zip",
     ]
     
     # 존재하는 모델 파일만 필터링
@@ -1427,6 +1426,7 @@ def test_inference_hard_voting(models: List, tokenizers: List, configs: List, in
             for model_idx, (model, tokenizer, config) in enumerate(zip(models, tokenizers, configs)):
                 inputs = tokenizer(
                     input_text,
+                    return_tensors="pt",
                     max_length=config['tokenizer']['encoder_max_len'],
                     truncation=True,
                     padding=True
@@ -1482,6 +1482,7 @@ def test_inference_soft_voting(models: List, tokenizers: List, configs: List, in
             for model, tokenizer, config in zip(models, tokenizers, configs):
                 inputs = tokenizer(
                     input_text,
+                    return_tensors="pt",
                     max_length=config['tokenizer']['encoder_max_len'],
                     truncation=True,
                     padding=True
@@ -1529,6 +1530,7 @@ def test_inference_length_based(models: List, tokenizers: List, configs: List, i
             for model, tokenizer, config in zip(models, tokenizers, configs):
                 inputs = tokenizer(
                     input_text,
+                    return_tensors="pt",
                     max_length=config['tokenizer']['encoder_max_len'],
                     truncation=True,
                     padding=True
@@ -1571,7 +1573,8 @@ def test_inference_logit_level(models: List, tokenizers: List, configs: List, in
         try:
             inputs = tokenizers[0](
                 input_text,
-                max_length=configs[0]['inference']['max_length'],
+                return_tensors="pt",
+                max_length=configs[0]['tokenizer']['encoder_max_len'],
                 truncation=True,
                 padding=True
             ).to(models[0].device)
@@ -1644,7 +1647,8 @@ def test_inference_realtime_token(models: List, tokenizers: List, configs: List,
         try:
             inputs = tokenizers[0](
                 input_text,
-                max_length=configs[0]['inference']['max_length'],
+                return_tensors="pt",
+                max_length=configs[0]['tokenizer']['encoder_max_len'],
                 truncation=True,
                 padding=True
             ).to(models[0].device)
