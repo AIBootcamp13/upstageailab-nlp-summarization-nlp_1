@@ -28,10 +28,10 @@ import log_util as log
 from baseline import compute_metrics
 
 # 검증 데이터 개수 제한 (None이면 전체 데이터 사용)
-DEV_DATA_LIMIT = None #50  # 0이나 None이 아닌 정수를 설정하면 해당 개수만큼만 사용
+DEV_DATA_LIMIT = 50  # 0이나 None이 아닌 정수를 설정하면 해당 개수만큼만 사용
 
 # 테스트 데이터 개수 제한 (None이면 전체 데이터 사용)
-TEST_DATA_LIMIT = None #50  # 0이나 None이 아닌 정수를 설정하면 해당 개수만큼만 사용
+TEST_DATA_LIMIT = 50  # 0이나 None이 아닌 정수를 설정하면 해당 개수만큼만 사용
 
 import argparse
 import json
@@ -1477,7 +1477,8 @@ def test_inference_soft_voting(models: List, tokenizers: List, configs: List, in
     
     for input_text in tqdm(input_texts, desc="소프트보팅 테스트 추론"):
         try:
-            model_outputs = []
+            all_candidates = []
+            all_scores = []
             
             for model, tokenizer, config in zip(models, tokenizers, configs):
                 inputs = tokenizer(
@@ -1501,15 +1502,18 @@ def test_inference_soft_voting(models: List, tokenizers: List, configs: List, in
                         num_return_sequences=config['inference']['num_beams']
                     )
                 
-                for sequence in outputs.sequences:
+                for i, sequence in enumerate(outputs.sequences):
                     text_output = tokenizer.decode(sequence, skip_special_tokens=True)
                     for token in remove_tokens:
                         text_output = text_output.replace(token, " ")
-                    model_outputs.append(text_output.strip())
+                    score = outputs.sequences_scores[i].item() if hasattr(outputs, 'sequences_scores') else 0.0
+                    all_candidates.append(text_output.strip())
+                    all_scores.append(score)
             
-            # 소프트 보팅: 평균 스코어가 가장 높은 결과 선택
-            if model_outputs:
-                predictions.append(model_outputs[0])  # 첫 번째 결과 사용
+            # 점수가 가장 높은 후보 선택
+            if all_candidates and all_scores:
+                best_idx = int(np.argmax(all_scores))
+                predictions.append(all_candidates[best_idx])
             else:
                 predictions.append("")
                 
@@ -1525,7 +1529,7 @@ def test_inference_length_based(models: List, tokenizers: List, configs: List, i
     
     for input_text in tqdm(input_texts, desc="길이기반 테스트 추론"):
         try:
-            candidates = []
+            candidates_ids = []
             
             for model, tokenizer, config in zip(models, tokenizers, configs):
                 inputs = tokenizer(
@@ -1546,16 +1550,16 @@ def test_inference_length_based(models: List, tokenizers: List, configs: List, i
                         early_stopping=config['inference']['early_stopping']
                     )
                 
-                generated_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+                generated_ids = output_ids[0].tolist()
+                candidates_ids.append(generated_ids)
+            
+            # 가장 긴 결과 선택 (토큰 수 기준)
+            if candidates_ids:
+                longest_ids = max(candidates_ids, key=len)
+                generated_text = tokenizers[0].decode(longest_ids, skip_special_tokens=True)
                 for token in remove_tokens:
                     generated_text = generated_text.replace(token, " ")
-                
-                candidates.append(generated_text.strip())
-            
-            # 가장 긴 결과 선택
-            if candidates:
-                longest_candidate = max(candidates, key=len)
-                predictions.append(longest_candidate)
+                predictions.append(generated_text.strip())
             else:
                 predictions.append("")
                 
@@ -1571,68 +1575,110 @@ def test_inference_logit_level(models: List, tokenizers: List, configs: List, in
     
     for input_text in tqdm(input_texts, desc="Logit레벨 테스트 추론"):
         try:
-            inputs = tokenizers[0](
+            tokenizer = tokenizers[0]
+            config = configs[0]
+            device = models[0].device
+            
+            # 입력 토큰화
+            inputs = tokenizer(
                 input_text,
                 return_tensors="pt",
-                max_length=configs[0]['tokenizer']['encoder_max_len'],
+                max_length=config['tokenizer']['encoder_max_len'],
                 truncation=True,
                 padding=True
-            ).to(models[0].device)
+            ).to(device)
             
-            # 빔 서치 파라미터
-            max_length = configs[0]['inference']['generate_max_length']
-            num_beams = configs[0]['inference']['num_beams']
+            # 각 모델의 encoder 출력 미리 계산
+            encoder_outputs_list = []
+            for model in models:
+                with torch.no_grad():
+                    encoder_outputs = model.get_encoder()(
+                        input_ids=inputs['input_ids'],
+                        attention_mask=inputs['attention_mask']
+                    )
+                    encoder_outputs_list.append(encoder_outputs.last_hidden_state.clone().detach())
             
-            # 초기 시퀀스
-            batch_size = inputs['input_ids'].size(0)
-            device = inputs['input_ids'].device
+            # Beam Search 설정
+            max_length = config['inference']['generate_max_length']
+            beam_size = config['inference']['num_beams']
+            decoder_start_token_id = tokenizer.bos_token_id
+            if decoder_start_token_id is None:
+                decoder_start_token_id = tokenizer.eos_token_id
+            eos_token_id = tokenizer.eos_token_id
             
-            sequences = inputs['input_ids'].clone()
-            scores = torch.zeros(batch_size, device=device)
-            finished = torch.zeros(batch_size, dtype=torch.bool, device=device)
+            sequences = torch.full((beam_size, 1), decoder_start_token_id, device=device)
+            beam_scores = torch.full((beam_size,), -float('inf'), device=device)
+            beam_scores[0] = 0.0
+            finished_sequences = []
             
-            # 생성 루프
-            for step in range(max_length - sequences.size(1)):
-                if finished.all():
+            # Beam Search 루프
+            for step in range(max_length - 1):
+                valid_mask = beam_scores > -float('inf')
+                current_sequences = sequences[valid_mask]
+                current_scores = beam_scores[valid_mask]
+                if current_sequences.size(0) == 0:
                     break
                 
-                # 모든 모델의 logit 수집
-                ensemble_logits = None
-                
-                for model in models:
+                # 모델별 logits 평균
+                all_next_logits = []
+                for model_idx, model in enumerate(models):
                     with torch.no_grad():
-                        outputs = model(input_ids=sequences, attention_mask=torch.ones_like(sequences))
-                        current_logits = outputs.logits[:, -1, :]  # 마지막 위치의 logits
-                        
-                        if ensemble_logits is None:
-                            ensemble_logits = current_logits.clone()
-                        else:
-                            ensemble_logits += current_logits
+                        decoder_outputs = model.get_decoder()(
+                            input_ids=current_sequences,
+                            encoder_hidden_states=encoder_outputs_list[model_idx].expand(current_sequences.size(0), -1, -1),
+                            encoder_attention_mask=inputs['attention_mask'].expand(current_sequences.size(0), -1)
+                        )
+                        logits = model.lm_head(decoder_outputs.last_hidden_state)
+                        next_token_logits = logits[:, -1, :]
+                        all_next_logits.append(next_token_logits)
+                if not all_next_logits:
+                    predictions.append("")
+                    continue
+                ensemble_logits = torch.stack(all_next_logits).mean(dim=0)
+                next_token_log_probs = torch.log_softmax(ensemble_logits, dim=-1)
+                vocab_size = next_token_log_probs.size(-1)
+                next_scores = current_scores.unsqueeze(1) + next_token_log_probs
+                next_scores = next_scores.view(-1)
                 
-                # 평균 logits 계산
-                ensemble_logits = ensemble_logits / len(models)
+                top_k = min(beam_size * 2, next_scores.numel())
+                top_scores, top_indices = torch.topk(next_scores, top_k)
                 
-                # 다음 토큰 예측
-                next_token_logits = ensemble_logits
-                next_tokens = torch.argmax(next_token_logits, dim=-1)
-                
-                # 시퀀스 업데이트
-                sequences = torch.cat([sequences, next_tokens.unsqueeze(-1)], dim=-1)
-                
-                # EOS 토큰 체크
-                eos_token_id = tokenizers[0].eos_token_id
-                if eos_token_id is not None:
-                    finished = finished | (next_tokens == eos_token_id)
+                new_sequences = []
+                new_scores = []
+                for score, flat_index in zip(top_scores, top_indices):
+                    beam_idx = int(flat_index // vocab_size)
+                    token_id = int(flat_index % vocab_size)
+                    new_seq = torch.cat([current_sequences[beam_idx], torch.tensor([token_id], device=device)])
+                    if eos_token_id is not None and token_id == eos_token_id:
+                        finished_sequences.append((new_seq, float(score.item())))
+                    else:
+                        new_sequences.append(new_seq)
+                        new_scores.append(float(score.item()))
+                    if len(new_sequences) >= beam_size:
+                        break
+                if not new_sequences and not finished_sequences:
+                    break
+                if new_sequences:
+                    max_len = max(len(seq) for seq in new_sequences)
+                    sequences = torch.full((beam_size, max_len), tokenizer.pad_token_id, device=device)
+                    beam_scores = torch.full((beam_size,), -float('inf'), device=device)
+                    for i, (seq, score) in enumerate(zip(new_sequences[:beam_size], new_scores[:beam_size])):
+                        sequences[i, :len(seq)] = seq
+                        beam_scores[i] = score
+                else:
+                    break
             
-            # 최종 시퀀스에서 생성된 부분만 추출
-            generated_sequence = sequences[0][inputs['input_ids'].size(1):]
-            generated_text = tokenizers[0].decode(generated_sequence, skip_special_tokens=True)
+            # 최고 점수 시퀀스 선택
+            if finished_sequences:
+                best_sequence, _ = max(finished_sequences, key=lambda x: x[1])
+            else:
+                best_idx = int(torch.argmax(beam_scores))
+                best_sequence = sequences[best_idx]
             
+            generated_text = tokenizer.decode(best_sequence, skip_special_tokens=False)
             for token in remove_tokens:
                 generated_text = generated_text.replace(token, " ")
-            
             predictions.append(generated_text.strip())
-            
         except Exception as e:
             log.warning(f"Logit레벨 테스트 추론 샘플 처리 실패: {e}")
             predictions.append("")
